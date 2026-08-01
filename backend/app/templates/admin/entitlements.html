@@ -1,0 +1,55 @@
+{% extends "admin/base.html" %}
+{% block title %}开通记录 - 分身交付平台{% endblock %}
+{% block page_title %}开通记录{% endblock %}
+{% block content %}
+{% if notice %}<div class="alert alert-success">操作已完成</div>{% endif %}
+{% if error %}<div class="alert alert-error">操作失败，请检查商品映射或事件状态</div>{% endif %}
+
+<div class="section-heading first-section"><div><span class="eyebrow">PRODUCT MAPPING</span><h2>商品码映射</h2></div></div>
+<form class="form-card compact-form-grid" method="post" action="/admin/entitlements/mappings">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <label class="field"><span>商品码</span><input name="product_code" maxlength="120" required placeholder="例如 COURSE-001"></label>
+  <label class="field"><span>开通课程</span><select name="course_id" required><option value="">请选择课程</option>{% for course in courses %}<option value="{{ course.id }}">{{ course.title }}</option>{% endfor %}</select></label>
+  <button class="btn btn-primary" type="submit">保存映射</button>
+</form>
+
+<div class="table-card table-spaced">
+  <table class="data-table">
+    <thead><tr><th>商品码</th><th>课程</th><th>状态</th><th>操作</th></tr></thead>
+    <tbody>
+    {% for mapping, course in mappings %}
+      <tr>
+        <td><strong>{{ mapping.product_code }}</strong></td>
+        <td>{{ course.title }}</td>
+        <td><span class="badge {{ 'badge-success' if mapping.is_active else 'badge-muted' }}">{{ '生效中' if mapping.is_active else '已停用' }}</span></td>
+        <td><form method="post" action="/admin/entitlements/mappings/{{ mapping.id }}/toggle"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn btn-small btn-secondary" type="submit">{{ '停用' if mapping.is_active else '启用' }}</button></form></td>
+      </tr>
+    {% else %}
+      <tr><td colspan="4"><div class="empty-state">还没有商品码映射</div></td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="section-heading"><div><span class="eyebrow">WEBHOOK EVENTS</span><h2>最近事件</h2></div><span class="form-help">最多显示最近 100 条</span></div>
+<div class="table-card">
+  <table class="data-table">
+    <thead><tr><th>事件</th><th>手机号</th><th>商品码</th><th>动作</th><th>结果</th><th>时间</th><th>操作</th></tr></thead>
+    <tbody>
+    {% for row in event_rows %}{% set event = row.event %}
+      <tr>
+        <td><strong>{{ event.event_id }}</strong><small class="subline">订单 {{ event.order_id }}</small></td>
+        <td>****{{ row.phone_last4 }}</td>
+        <td>{{ event.product_code }}</td>
+        <td>{{ {'grant':'开通','renew':'续期','revoke':'撤销'}.get(event.action, event.action) }}</td>
+        <td><span class="badge {{ 'badge-success' if event.result == 'applied' else 'badge-danger' }}">{{ event.result }}</span>{% if event.error_message %}<small class="subline danger-text">{{ event.error_message }}</small>{% endif %}</td>
+        <td>{{ event.created_at.strftime('%Y-%m-%d %H:%M') if event.created_at else '-' }}</td>
+        <td>{% if event.result != 'applied' %}<form method="post" action="/admin/entitlements/events/{{ event.id }}/replay"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn btn-small btn-secondary" type="submit">人工重放</button></form>{% else %}-{% endif %}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="7"><div class="empty-state">尚未收到开通事件</div></td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

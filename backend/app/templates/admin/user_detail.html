@@ -1,0 +1,35 @@
+{% extends "admin/base.html" %}
+{% block title %}用户课程权益 - 分身交付平台{% endblock %}
+{% block page_title %}用户课程权益{% endblock %}
+{% block page_action %}<a class="btn btn-secondary" href="/admin/users">返回用户列表</a>{% endblock %}
+{% block content %}
+{% if notice %}<div class="alert alert-success">课程权益已更新</div>{% endif %}
+{% if error %}<div class="alert alert-error">操作失败：请确认用户已绑定手机号且参数有效</div>{% endif %}
+
+<div class="detail-header">
+  <div><span class="eyebrow">{{ user.id }}</span><h2>{{ user.nickname or '未命名用户' }}</h2><p class="form-help">手机号：{{ ('****' ~ user.phone_last4) if user.phone_last4 else '未绑定' }}</p></div>
+  <span class="badge {{ 'badge-success' if user.is_active else 'badge-muted' }}">{{ '正常' if user.is_active else '已禁用' }}</span>
+</div>
+
+<form class="form-card compact-form-grid" method="post" action="/admin/users/{{ user.id }}/entitlements">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <label class="field"><span>课程</span><select name="course_id" required><option value="">请选择课程</option>{% for course in courses %}<option value="{{ course.id }}">{{ course.title }}</option>{% endfor %}</select></label>
+  <label class="field"><span>操作</span><select name="action"><option value="grant">手工开通</option><option value="revoke">手工撤销</option></select></label>
+  <label class="field"><span>有效天数</span><input type="number" name="duration_days" min="0" max="3650" value="0"><small class="form-help">0 表示长期有效；撤销时忽略</small></label>
+  <button class="btn btn-primary" type="submit">确认操作</button>
+</form>
+
+<div class="section-heading"><div><span class="eyebrow">CURRENT ACCESS</span><h2>当前权益</h2></div></div>
+<div class="table-card">
+  <table class="data-table">
+    <thead><tr><th>课程</th><th>状态</th><th>生效时间</th><th>到期时间</th><th>来源订单</th></tr></thead>
+    <tbody>
+    {% for entitlement, course in entitlement_rows %}
+      <tr><td><strong>{{ course.title }}</strong></td><td><span class="badge {{ 'badge-success' if entitlement.status == 'active' else 'badge-danger' }}">{{ entitlement.status }}</span></td><td>{{ entitlement.effective_at.strftime('%Y-%m-%d %H:%M') }}</td><td>{{ entitlement.expires_at.strftime('%Y-%m-%d %H:%M') if entitlement.expires_at else '长期' }}</td><td>{{ entitlement.source_order_id or '-' }}</td></tr>
+    {% else %}
+      <tr><td colspan="5"><div class="empty-state">当前没有课程权益</div></td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

@@ -3,6 +3,26 @@
   padding-bottom: calc(44rpx + env(safe-area-inset-bottom));
 }
 
+.profile-state {
+  min-height: 360rpx;
+  padding: 50rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #777166;
+  font-size: 27rpx;
+  text-align: center;
+}
+
+.profile-error {
+  color: #9f3b32;
+}
+
+.state-button {
+  margin-top: 28rpx;
+}
+
 .identity-card {
   padding: 34rpx 32rpx;
   display: flex;
@@ -92,6 +112,11 @@
   background: #f7f1df;
   color: #9a7200;
   font-size: 22rpx;
+}
+
+.entitlement-state.bound {
+  background: #e6f6ea;
+  color: #16803a;
 }
 
 .entitlement-copy {

@@ -2,7 +2,9 @@
   "pages": [
     "pages/chat/index",
     "pages/courses/index",
-    "pages/profile/index"
+    "pages/profile/index",
+    "pages/courses/detail",
+    "pages/player/index"
   ],
   "window": {
     "navigationBarTextStyle": "black",

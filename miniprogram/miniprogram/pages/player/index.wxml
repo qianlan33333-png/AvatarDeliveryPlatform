@@ -1,0 +1,53 @@
+<view class="player-page">
+  <view wx:if="{{loading}}" class="player-state">正在申请播放权限…</view>
+  <view wx:elif="{{error}}" class="player-state error-state">
+    <text>{{error}}</text>
+    <button class="primary-button retry-button" bindtap="loadPlayer">重新进入</button>
+  </view>
+  <block wx:elif="{{lesson}}">
+    <video
+      id="course-video"
+      class="course-video"
+      src="{{sourceUrl}}"
+      initial-time="{{currentPosition}}"
+      controls="{{true}}"
+      autoplay="{{true}}"
+      show-center-play-btn="{{true}}"
+      show-play-btn="{{true}}"
+      show-fullscreen-btn="{{true}}"
+      show-screen-lock-button="{{true}}"
+      enable-progress-gesture="{{true}}"
+      enable-play-gesture="{{true}}"
+      vslide-gesture="{{true}}"
+      vslide-gesture-in-fullscreen="{{true}}"
+      direction="90"
+      object-fit="contain"
+      bindtimeupdate="onTimeUpdate"
+      bindended="onEnded"
+      binderror="onPlaybackError"
+    ></video>
+
+    <view class="speed-bar" aria-label="播放速度">
+      <text class="speed-label">倍速</text>
+      <button
+        wx:for="{{playbackRates}}"
+        wx:key="*this"
+        class="speed-button {{playbackRate === item ? 'active' : ''}}"
+        data-rate="{{item}}"
+        bindtap="changePlaybackRate"
+      >{{item}}x</button>
+    </view>
+
+    <view class="lesson-panel">
+      <text wx:if="{{lesson.is_preview}}" class="preview-label">试听课节</text>
+      <text class="lesson-title">{{lesson.title}}</text>
+      <text wx:if="{{lesson.description}}" class="lesson-description">{{lesson.description}}</text>
+      <view class="progress-note">学习进度会自动保存，下次从当前位置继续</view>
+    </view>
+
+    <view class="lesson-navigation safe-area-bottom">
+      <button class="nav-button" disabled="{{!previousLessonId}}" data-id="{{previousLessonId}}" bindtap="switchLesson">上一课</button>
+      <button class="nav-button next-button" disabled="{{!nextLessonId}}" data-id="{{nextLessonId}}" bindtap="switchLesson">下一课</button>
+    </view>
+  </block>
+</view>

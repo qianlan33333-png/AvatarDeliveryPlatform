@@ -19,10 +19,13 @@
         <td>{{ user.last_login_at.strftime('%Y-%m-%d %H:%M') if user.last_login_at else '-' }}</td>
         <td><span class="badge {{ 'badge-success' if user.is_active else 'badge-muted' }}">{{ '正常' if user.is_active else '已禁用' }}</span></td>
         <td>
+          <div class="inline-actions">
+          <a class="btn btn-small btn-secondary" href="/admin/users/{{ user.id }}">课程权益</a>
           <form method="post" action="/admin/users/{{ user.id }}/toggle">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <button class="btn btn-small {{ 'btn-danger' if user.is_active else 'btn-secondary' }}" type="submit">{{ '禁用' if user.is_active else '启用' }}</button>
           </form>
+          </div>
         </td>
       </tr>
     {% else %}
@@ -37,4 +40,3 @@
   {% if has_next %}<a class="btn btn-ghost" href="?page={{ page + 1 }}&keyword={{ encoded_keyword }}">下一页</a>{% endif %}
 </nav>
 {% endblock %}
-

@@ -79,6 +79,9 @@ input:focus, textarea:focus, select:focus { border-color: var(--yellow-dark); bo
 .detail-header h2, .section-heading h2, .upload-heading h2 { margin: 4px 0 0; }
 .eyebrow { color: #9c7a0b; font-size: 11px; font-weight: 750; letter-spacing: .12em; text-transform: uppercase; }
 .section-heading { margin: 34px 0 14px; }
+.first-section { margin-top: 0; }
+.table-spaced { margin-top: 16px; }
+.compact-form-grid { display: grid; grid-template-columns: minmax(180px, .8fr) minmax(260px, 1.4fr) auto; align-items: end; gap: 14px; }
 .tag-list { display: flex; flex-wrap: wrap; gap: 5px; }
 .tag { display: inline-flex; padding: 3px 8px; border-radius: 99px; background: #fff4bd; color: #6f5700; font-size: 12px; }
 .lesson-list { display: grid; gap: 12px; }
@@ -115,4 +118,5 @@ input:focus, textarea:focus, select:focus { border-color: var(--yellow-dark); bo
   .inline-actions { flex-wrap: wrap; }
   .callout { flex-direction: column; }
   .rename-form { grid-template-columns: 1fr; }
+  .compact-form-grid { grid-template-columns: 1fr; }
 }

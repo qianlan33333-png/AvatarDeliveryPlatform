@@ -1,31 +1,46 @@
 <view class="screen profile-page">
-  <view class="identity-card surface-card">
-    <view class="avatar-placeholder">我</view>
-    <view class="identity-copy">
-      <text class="identity-title">尚未绑定手机号</text>
-      <text class="identity-subtitle">绑定后自动认领已购买的课程权益</text>
-    </view>
+  <view wx:if="{{loading}}" class="profile-state surface-card">正在加载用户信息…</view>
+  <view wx:elif="{{error}}" class="profile-state surface-card">
+    <text class="profile-error">{{error}}</text>
+    <button class="primary-button state-button" bindtap="loadProfile">重新加载</button>
   </view>
-
-  <view class="summary-grid">
-    <view class="summary-card surface-card">
-      <text class="summary-value">0</text>
-      <text class="summary-label">已开通课程</text>
+  <block wx:elif="{{profile}}">
+    <view class="identity-card surface-card">
+      <image wx:if="{{profile.avatar_url}}" class="avatar-placeholder" src="{{profile.avatar_url}}" mode="aspectFill"></image>
+      <view wx:else class="avatar-placeholder">我</view>
+      <view class="identity-copy">
+        <text class="identity-title">{{profile.nickname || (profile.phone_bound ? '已绑定用户' : '尚未绑定手机号')}}</text>
+        <text class="identity-subtitle">{{profile.phone_bound ? ('手机号 ****' + profile.phone_last4) : '绑定后自动认领已购买的课程权益'}}</text>
+      </view>
     </view>
-    <view class="summary-card surface-card">
-      <text class="summary-value">0</text>
-      <text class="summary-label">学习中课节</text>
-    </view>
-  </view>
 
-  <view class="entitlement-card surface-card">
-    <view class="entitlement-head">
-      <text class="entitlement-title">课程权益</text>
-      <text class="entitlement-state">待绑定</text>
+    <view class="summary-grid">
+      <view class="summary-card surface-card">
+        <text class="summary-value">{{profile.active_course_count}}</text>
+        <text class="summary-label">已开通课程</text>
+      </view>
+      <view class="summary-card surface-card">
+        <text class="summary-value">{{profile.learning_lesson_count}}</text>
+        <text class="summary-label">学习中课节</text>
+      </view>
     </view>
-    <text class="entitlement-copy">系统会用手机号匹配外部 webhook 已开通的课程，不需要重复下单。</text>
-    <button class="primary-button bind-button" bindtap="onBindPhone">绑定手机号</button>
-  </view>
 
-  <text class="privacy-note">手机号仅用于身份与课程权益匹配</text>
+    <view class="entitlement-card surface-card">
+      <view class="entitlement-head">
+        <text class="entitlement-title">课程权益</text>
+        <text class="entitlement-state {{profile.phone_bound ? 'bound' : ''}}">{{profile.phone_bound ? '已绑定' : '待绑定'}}</text>
+      </view>
+      <text class="entitlement-copy">系统会用手机号匹配外部 webhook 已开通的课程，不需要重复下单。</text>
+      <button
+        wx:if="{{!profile.phone_bound}}"
+        class="primary-button bind-button"
+        open-type="getPhoneNumber"
+        loading="{{bindingPhone}}"
+        disabled="{{bindingPhone}}"
+        bindgetphonenumber="onGetPhoneNumber"
+      >{{bindingPhone ? '绑定中…' : '绑定手机号'}}</button>
+    </view>
+
+    <text class="privacy-note">手机号仅用于身份与课程权益匹配</text>
+  </block>
 </view>

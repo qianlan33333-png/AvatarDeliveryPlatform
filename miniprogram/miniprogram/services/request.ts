@@ -25,9 +25,16 @@ function getErrorMessage(payload: unknown): string {
   }
 
   const detail = (payload as { detail?: unknown }).detail
-  return typeof detail === 'string' && detail.length > 0
-    ? detail
-    : '请求失败，请稍后重试'
+  if (typeof detail === 'string' && detail.length > 0) {
+    return detail
+  }
+  if (typeof detail === 'object' && detail !== null && 'message' in detail) {
+    const message = (detail as { message?: unknown }).message
+    if (typeof message === 'string' && message.length > 0) {
+      return message
+    }
+  }
+  return '请求失败，请稍后重试'
 }
 
 export function request<TResponse>(options: RequestOptions): Promise<TResponse> {

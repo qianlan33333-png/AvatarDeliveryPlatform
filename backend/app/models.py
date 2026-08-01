@@ -166,8 +166,25 @@ class EntitlementEvent(Base):
     order_id: Mapped[str] = mapped_column(String(160), nullable=False)
     product_code: Mapped[str] = mapped_column(String(120), nullable=False)
     phone_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    phone_ciphertext: Mapped[str] = mapped_column(Text, default="", nullable=False)
     payload_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     result: Mapped[str] = mapped_column(String(30), nullable=False)
+    error_message: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    effective_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    replayed_from_event_id: Mapped[str | None] = mapped_column(String(160))
+    created_by: Mapped[str] = mapped_column(String(30), default="webhook", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class WebhookNonce(Base):
+    __tablename__ = "webhook_nonces"
+    __table_args__ = (UniqueConstraint("provider", "nonce", name="uq_webhook_provider_nonce"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    provider: Mapped[str] = mapped_column(String(40), nullable=False)
+    nonce: Mapped[str] = mapped_column(String(160), nullable=False)
+    event_id: Mapped[str] = mapped_column(String(180), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -245,3 +262,20 @@ class LLMConfig(Base, TimestampMixin):
     temperature_milli: Mapped[int] = mapped_column(Integer, default=500, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
+
+class ChatReservation(Base):
+    __tablename__ = "chat_reservations"
+    __table_args__ = (Index("ix_chat_reservation_status_expiry", "status", "expires_at"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    ticket_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    conversation_id: Mapped[str | None] = mapped_column(
+        ForeignKey("conversations.id", ondelete="CASCADE")
+    )
+    prompt: Mapped[str] = mapped_column(Text, nullable=False)
+    candidate_course_ids: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="reserved", nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

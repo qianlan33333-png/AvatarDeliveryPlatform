@@ -6,4 +6,5 @@ interface IAppOption {
     envVersion: 'develop' | 'trial' | 'release'
     sessionReady: boolean
   }
+  ensureSession(): Promise<void>
 }

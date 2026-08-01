@@ -1,10 +1,11 @@
+from datetime import UTC, datetime, timedelta
 from urllib.parse import quote
 
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import or_, select
 
-from backend.app.models import User
+from backend.app.models import Course, CourseEntitlement, User
 from backend.app.modules.admin.auth import (
     authenticate_admin,
     clear_admin_session,
@@ -12,6 +13,10 @@ from backend.app.modules.admin.auth import (
     require_csrf,
 )
 from backend.app.modules.admin.dependencies import CurrentAdmin, DBSession, admin_context
+from backend.app.modules.entitlements.service import (
+    EntitlementApplicationError,
+    set_manual_course_entitlement,
+)
 from backend.app.web import templates
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -123,35 +128,73 @@ def toggle_user(
     return RedirectResponse("/admin/users", status_code=303)
 
 
-@router.get("/entitlements", response_class=HTMLResponse, include_in_schema=False)
-def entitlements_placeholder(
+@router.get("/users/{user_id}", response_class=HTMLResponse, include_in_schema=False)
+def user_detail_page(
+    user_id: str,
     request: Request,
+    db: DBSession,
     admin: CurrentAdmin,
+    notice: str = "",
+    error: str = "",
 ):
+    user = db.get(User, user_id)
+    if not user:
+        return RedirectResponse("/admin/users", status_code=303)
+    entitlement_rows = list(
+        db.execute(
+            select(CourseEntitlement, Course)
+            .join(Course, Course.id == CourseEntitlement.course_id)
+            .where(CourseEntitlement.user_id == user.id)
+            .order_by(Course.sort_order, Course.created_at)
+        ).all()
+    )
+    courses = list(
+        db.scalars(select(Course).where(Course.status != "archived").order_by(Course.sort_order))
+    )
     return templates.TemplateResponse(
         request=request,
-        name="admin/placeholder.html",
+        name="admin/user_detail.html",
         context=admin_context(
             request,
             admin,
-            page_title="开通记录",
-            message="权益 webhook 与开通审计将在下一实施批次接入。",
+            user=user,
+            entitlement_rows=entitlement_rows,
+            courses=courses,
+            notice=notice,
+            error=error,
         ),
     )
 
 
-@router.get("/llm-config", response_class=HTMLResponse, include_in_schema=False)
-def llm_placeholder(
+@router.post("/users/{user_id}/entitlements", include_in_schema=False)
+def manual_user_entitlement(
+    user_id: str,
     request: Request,
-    admin: CurrentAdmin,
+    db: DBSession,
+    _: CurrentAdmin,
+    course_id: str = Form(...),
+    action: str = Form(...),
+    duration_days: int = Form(0),
+    csrf_token: str = Form(...),
 ):
-    return templates.TemplateResponse(
-        request=request,
-        name="admin/placeholder.html",
-        context=admin_context(
-            request,
-            admin,
-            page_title="模型配置",
-            message="OpenAI-compatible 模型配置将在问答实施批次接入。",
-        ),
-    )
+    require_csrf(request, csrf_token)
+    user = db.get(User, user_id)
+    course = db.get(Course, course_id)
+    if not user or not course or action not in {"grant", "revoke"}:
+        return RedirectResponse(f"/admin/users/{user_id}?error=invalid", status_code=303)
+    if duration_days < 0 or duration_days > 3650:
+        return RedirectResponse(f"/admin/users/{user_id}?error=duration", status_code=303)
+    expires_at = None
+    if action == "grant" and duration_days:
+        expires_at = datetime.now(UTC) + timedelta(days=duration_days)
+    try:
+        set_manual_course_entitlement(
+            db,
+            user=user,
+            course_id=course.id,
+            action=action,  # type: ignore[arg-type]
+            expires_at=expires_at,
+        )
+    except EntitlementApplicationError:
+        return RedirectResponse(f"/admin/users/{user_id}?error=phone", status_code=303)
+    return RedirectResponse(f"/admin/users/{user_id}?notice=entitlement", status_code=303)

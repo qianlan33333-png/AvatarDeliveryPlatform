@@ -26,7 +26,8 @@
   font-size: 24rpx;
 }
 
-.empty-card {
+.empty-card,
+.state-card {
   min-height: 500rpx;
   padding: 70rpx 44rpx;
   display: flex;
@@ -34,6 +35,146 @@
   align-items: center;
   justify-content: center;
   text-align: center;
+}
+
+.state-card {
+  min-height: 360rpx;
+  padding: 54rpx 40rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.loading-dot {
+  width: 34rpx;
+  height: 34rpx;
+  border: 5rpx solid #efe6cd;
+  border-top-color: #d9a900;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.error-symbol {
+  background: #fff0ef;
+  color: #b42318;
+}
+
+.retry-button {
+  min-width: 220rpx;
+  margin-top: 28rpx;
+}
+
+.course-list {
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+}
+
+.course-card {
+  overflow: hidden;
+}
+
+.course-card:active {
+  transform: scale(0.99);
+}
+
+.course-cover {
+  position: relative;
+  height: 300rpx;
+  overflow: hidden;
+  background: #f3e5a8;
+}
+
+.course-cover-image,
+.course-cover-fallback {
+  width: 100%;
+  height: 100%;
+}
+
+.course-cover-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(145deg, #f5d060, #fdf8e7);
+  color: rgba(45, 45, 45, 0.72);
+  font-size: 76rpx;
+  font-weight: 800;
+}
+
+.course-badge {
+  position: absolute;
+  top: 22rpx;
+  right: 22rpx;
+  padding: 9rpx 18rpx;
+  border-radius: 99rpx;
+  font-size: 22rpx;
+  font-weight: 700;
+}
+
+.course-badge.locked {
+  background: rgba(255, 255, 255, 0.9);
+  color: #806500;
+}
+
+.course-badge.unlocked {
+  background: rgba(31, 128, 62, 0.92);
+  color: #ffffff;
+}
+
+.course-body {
+  padding: 28rpx 30rpx 30rpx;
+}
+
+.course-title,
+.course-subtitle,
+.course-description {
+  display: block;
+}
+
+.course-title {
+  color: #2d2d2d;
+  font-size: 34rpx;
+  font-weight: 750;
+}
+
+.course-subtitle {
+  margin-top: 9rpx;
+  color: #6f695f;
+  font-size: 26rpx;
+}
+
+.course-description {
+  margin-top: 18rpx;
+  display: -webkit-box;
+  overflow: hidden;
+  color: #898276;
+  font-size: 25rpx;
+  line-height: 1.65;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.course-footer {
+  margin-top: 24rpx;
+  padding-top: 20rpx;
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  border-top: 2rpx solid #f1ede4;
+  color: #918a7e;
+  font-size: 23rpx;
+}
+
+.course-action {
+  margin-left: auto;
+  color: #9a7200;
+  font-weight: 650;
 }
 
 .empty-symbol {
