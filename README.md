@@ -31,7 +31,19 @@ ruff check backend tests
 
 ## 生产约束
 
-- 生产目标为独立 4C8G 腾讯云服务器，目录 `/srv/avatar-delivery`。
+- 当前部署目标为用户已重置的 `49.232.57.128`，生产目录 `/srv/avatar-delivery`。
+- 当前机器为 2C2G，只作为首版 MVP 宿主；100 个播放租约必须在 VOD 接通后经混合压测验收，不能仅凭配置宣称达标。
 - 视频上传和播放仅使用腾讯云 VOD/CDN。
-- 禁止部署到 `49.232.57.128`。
+- 业务服务器不接收视频文件，也不执行 FFmpeg 转码。
 
+## 腾讯云 VOD 接入
+
+配置 `.env` 中的 `TENCENT_VOD_SECRET_ID`、`TENCENT_VOD_SECRET_KEY`、转码任务流和回调令牌。后台先创建素材记录，再由浏览器使用一次性签名直传 VOD。
+
+VOD 普通回调地址使用：
+
+```text
+https://<domain>/api/v1/media/vod/callback?token=<TENCENT_VOD_CALLBACK_TOKEN>
+```
+
+课程发布前，服务端会检查每个课节均绑定状态为 `ready` 的视频；试听必须创建独立试听课节。

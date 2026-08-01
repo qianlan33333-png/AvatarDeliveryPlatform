@@ -11,6 +11,9 @@ from backend.app.db import Base, get_engine
 from backend.app.health import router as health_router
 from backend.app.modules.admin.auth import bootstrap_admin
 from backend.app.modules.admin.router import router as admin_router
+from backend.app.modules.catalog.router import router as catalog_router
+from backend.app.modules.media.router import admin_router as media_admin_router
+from backend.app.modules.media.router import api_router as media_api_router
 
 APP_DIR = Path(__file__).resolve().parent
 
@@ -40,6 +43,9 @@ def create_app() -> FastAPI:
     application.mount("/static", StaticFiles(directory=APP_DIR / "static"), name="static")
     application.include_router(health_router)
     application.include_router(admin_router)
+    application.include_router(catalog_router)
+    application.include_router(media_admin_router)
+    application.include_router(media_api_router)
 
     @application.exception_handler(HTTPException)
     async def admin_auth_redirect(request: Request, exc: HTTPException):

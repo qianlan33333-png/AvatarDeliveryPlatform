@@ -1,0 +1,13 @@
+{% extends "admin/base.html" %}
+{% block title %}新建视频素材 - 分身交付平台{% endblock %}
+{% block page_title %}新建视频素材{% endblock %}
+{% block page_action %}<a class="btn btn-secondary" href="/admin/media">返回素材列表</a>{% endblock %}
+{% block content %}
+{% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+<form class="form-card narrow-card" method="post" action="/admin/media/new">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <label class="field"><span>素材标题 *</span><input name="title" maxlength="200" required placeholder="例如：第一课 产品定位"></label>
+  <p class="form-help">创建素材记录后选择本地视频。文件将从当前浏览器直接上传腾讯云 VOD。</p>
+  <div class="form-actions"><a class="btn btn-secondary" href="/admin/media">取消</a><button class="btn btn-primary" type="submit">下一步：选择视频</button></div>
+</form>
+{% endblock %}

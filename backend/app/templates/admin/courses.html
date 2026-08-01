@@ -1,0 +1,25 @@
+{% extends "admin/base.html" %}
+{% block title %}课程管理 - 分身交付平台{% endblock %}
+{% block page_title %}课程管理{% endblock %}
+{% block page_action %}<a class="btn btn-primary" href="/admin/courses/new">创建课程</a>{% endblock %}
+{% block content %}
+<div class="table-card">
+  <table class="data-table">
+    <thead><tr><th>课程</th><th>关键词</th><th>课节</th><th>排序</th><th>状态</th><th>操作</th></tr></thead>
+    <tbody>
+    {% for course in courses %}
+      <tr>
+        <td><strong>{{ course.title }}</strong><small class="subline">{{ course.subtitle or course.id }}</small></td>
+        <td><div class="tag-list">{% for keyword in course.keywords[:4] %}<span class="tag">{{ keyword }}</span>{% else %}-{% endfor %}</div></td>
+        <td>{{ course.lessons|length }}</td>
+        <td>{{ course.sort_order }}</td>
+        <td><span class="badge {{ 'badge-success' if course.status == 'published' else 'badge-muted' }}">{{ {'draft':'草稿','published':'已发布','archived':'已下架'}.get(course.status, course.status) }}</span></td>
+        <td><a class="btn btn-small btn-secondary" href="/admin/courses/{{ course.id }}/edit">编辑</a></td>
+      </tr>
+    {% else %}
+      <tr><td colspan="6"><div class="empty-state">还没有课程，先创建第一门课。</div></td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

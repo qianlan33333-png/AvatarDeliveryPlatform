@@ -1,0 +1,17 @@
+{% extends "admin/base.html" %}
+{% block title %}创建课程 - 分身交付平台{% endblock %}
+{% block page_title %}创建课程{% endblock %}
+{% block page_action %}<a class="btn btn-secondary" href="/admin/courses">返回课程列表</a>{% endblock %}
+{% block content %}
+{% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+<form class="form-card form-grid" method="post" action="/admin/courses/new">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <label class="field field-wide"><span>课程标题 *</span><input name="title" maxlength="200" required value="{{ form_values.title }}"></label>
+  <label class="field field-wide"><span>副标题</span><input name="subtitle" maxlength="500" value="{{ form_values.subtitle }}"></label>
+  <label class="field field-wide"><span>课程简介</span><textarea name="description" rows="7">{{ form_values.description }}</textarea></label>
+  <label class="field field-wide"><span>封面 URL</span><input type="url" name="cover_url" value="{{ form_values.cover_url }}" placeholder="https://..."></label>
+  <label class="field"><span>关键词</span><input name="keywords" value="{{ form_values.keywords }}" placeholder="AI，内容，增长"></label>
+  <label class="field"><span>课程排序</span><input type="number" name="sort_order" value="{{ form_values.sort_order }}"></label>
+  <div class="form-actions field-wide"><a class="btn btn-secondary" href="/admin/courses">取消</a><button class="btn btn-primary" type="submit">创建并添加课节</button></div>
+</form>
+{% endblock %}

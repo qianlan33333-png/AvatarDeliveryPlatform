@@ -1,0 +1,64 @@
+{% extends "admin/base.html" %}
+{% block title %}{{ course.title }} - 分身交付平台{% endblock %}
+{% block page_title %}编辑课程{% endblock %}
+{% block page_action %}<a class="btn btn-secondary" href="/admin/courses">返回课程列表</a>{% endblock %}
+{% block content %}
+{% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+{% if notice %}<div class="alert alert-success">{{ {'created':'课程已创建，请继续添加课节','saved':'课程信息已保存','published':'课程已发布','lesson-added':'课节已添加','lesson-saved':'课节已保存','lesson-deleted':'课节已删除，已发布课程会自动退回草稿'}.get(notice, '操作成功') }}</div>{% endif %}
+
+<div class="detail-header">
+  <div><span class="eyebrow">{{ course.id }}</span><h2>{{ course.title }}</h2></div>
+  <div class="inline-actions">
+    <span class="badge {{ 'badge-success' if course.status == 'published' else 'badge-muted' }}">{{ {'draft':'草稿','published':'已发布','archived':'已下架'}.get(course.status, course.status) }}</span>
+    <form method="post" action="/admin/courses/{{ course.id }}/publish"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn btn-primary" type="submit">发布课程</button></form>
+    {% if course.status != 'archived' %}<form method="post" action="/admin/courses/{{ course.id }}/archive"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn btn-danger" type="submit">下架</button></form>{% endif %}
+  </div>
+</div>
+
+<form class="form-card form-grid" method="post" action="/admin/courses/{{ course.id }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <label class="field field-wide"><span>课程标题 *</span><input name="title" maxlength="200" required value="{{ course.title }}"></label>
+  <label class="field field-wide"><span>副标题</span><input name="subtitle" maxlength="500" value="{{ course.subtitle }}"></label>
+  <label class="field field-wide"><span>课程简介</span><textarea name="description" rows="6">{{ course.description }}</textarea></label>
+  <label class="field field-wide"><span>封面 URL</span><input type="url" name="cover_url" value="{{ course.cover_url }}" placeholder="https://..."></label>
+  <label class="field"><span>关键词</span><input name="keywords" value="{{ course.keywords|join('，') }}"></label>
+  <label class="field"><span>课程排序</span><input type="number" name="sort_order" value="{{ course.sort_order }}"></label>
+  <div class="form-actions field-wide"><button class="btn btn-primary" type="submit">保存课程信息</button></div>
+</form>
+
+<div class="section-heading"><div><span class="eyebrow">LESSONS</span><h2>课节与视频</h2></div><a class="btn btn-secondary" href="/admin/media/new">上传新视频</a></div>
+<div class="lesson-list">
+{% for lesson in course.lessons %}
+  <details class="lesson-card" open>
+    <summary><span class="order-bubble">{{ loop.index }}</span><strong>{{ lesson.title }}</strong>{% if lesson.is_preview %}<span class="tag">试听</span>{% endif %}<span class="lesson-media-state">{{ lesson.video_asset.title if lesson.video_asset else '未绑定视频' }}</span></summary>
+    <form class="form-grid lesson-form" method="post" action="/admin/courses/{{ course.id }}/lessons/{{ lesson.id }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label class="field"><span>课节标题 *</span><input name="title" required value="{{ lesson.title }}"></label>
+      <label class="field"><span>排序</span><input type="number" name="sort_order" required value="{{ lesson.sort_order }}"></label>
+      <label class="field field-wide"><span>课节简介</span><textarea name="description" rows="3">{{ lesson.description }}</textarea></label>
+      <label class="field"><span>绑定视频</span><select name="video_asset_id"><option value="">暂不绑定</option>{% for asset in ready_assets %}<option value="{{ asset.id }}" {{ 'selected' if lesson.video_asset_id == asset.id else '' }}>{{ asset.title }} · {{ asset.duration_seconds }} 秒</option>{% endfor %}</select></label>
+      <label class="checkbox-field"><input type="checkbox" name="is_preview" value="true" {{ 'checked' if lesson.is_preview else '' }}><span>允许未购买用户试听完整课节</span></label>
+      <div class="form-actions field-wide">
+        <button class="btn btn-danger" type="submit" formaction="/admin/courses/{{ course.id }}/lessons/{{ lesson.id }}/delete" onclick="return confirm('确认删除这个课节？')">删除课节</button>
+        <button class="btn btn-secondary" type="submit">保存课节</button>
+      </div>
+    </form>
+  </details>
+{% else %}
+  <div class="empty-panel compact">尚未创建课节。试听必须使用独立试听课节，不能在前端截断付费视频。</div>
+{% endfor %}
+</div>
+
+<details class="form-card add-panel" open>
+  <summary><strong>添加课节</strong></summary>
+  <form class="form-grid lesson-form" method="post" action="/admin/courses/{{ course.id }}/lessons">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label class="field"><span>课节标题 *</span><input name="title" required placeholder="第 1 课：课程介绍"></label>
+    <label class="field"><span>排序</span><input type="number" name="sort_order" required value="{{ next_sort }}"></label>
+    <label class="field field-wide"><span>课节简介</span><textarea name="description" rows="3"></textarea></label>
+    <label class="field"><span>绑定视频</span><select name="video_asset_id"><option value="">暂不绑定</option>{% for asset in ready_assets %}<option value="{{ asset.id }}">{{ asset.title }} · {{ asset.duration_seconds }} 秒</option>{% endfor %}</select></label>
+    <label class="checkbox-field"><input type="checkbox" name="is_preview" value="true"><span>设为试听课节</span></label>
+    <div class="form-actions field-wide"><button class="btn btn-primary" type="submit">添加课节</button></div>
+  </form>
+</details>
+{% endblock %}

@@ -1,40 +1,20 @@
-from typing import Annotated
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import or_, select
-from sqlalchemy.orm import Session
 
-from backend.app.db import get_db
-from backend.app.models import AdminUser, User
+from backend.app.models import User
 from backend.app.modules.admin.auth import (
     authenticate_admin,
     clear_admin_session,
     establish_admin_session,
-    require_admin,
     require_csrf,
 )
+from backend.app.modules.admin.dependencies import CurrentAdmin, DBSession, admin_context
 from backend.app.web import templates
 
 router = APIRouter(prefix="/admin", tags=["admin"])
-DBSession = Annotated[Session, Depends(get_db)]
-
-
-def current_admin(request: Request, db: DBSession) -> AdminUser:
-    return require_admin(request, db)
-
-
-CurrentAdmin = Annotated[AdminUser, Depends(current_admin)]
-
-
-def admin_context(request: Request, admin: AdminUser, **values):
-    return {
-        "request": request,
-        "admin": admin,
-        "csrf_token": request.session.get("csrf_token", ""),
-        **values,
-    }
 
 
 @router.get("", include_in_schema=False)

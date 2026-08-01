@@ -1,0 +1,99 @@
+{% extends "admin/base.html" %}
+{% block title %}上传 {{ asset.title }} - 分身交付平台{% endblock %}
+{% block page_title %}上传视频{% endblock %}
+{% block page_action %}<a class="btn btn-secondary" href="/admin/media">返回素材列表</a>{% endblock %}
+{% block content %}
+<div class="upload-card" data-asset-id="{{ asset.id }}">
+  <div class="upload-heading"><div><span class="eyebrow">视频素材</span><h2>{{ asset.title }}</h2></div><span id="asset-status" class="badge {{ 'badge-success' if asset.status == 'ready' else 'badge-muted' }}">{{ {'pending_upload':'待上传','processing':'转码中','ready':'已就绪','failed':'失败','archived':'已归档'}.get(asset.status, asset.status) }}</span></div>
+  <form class="rename-form" method="post" action="/admin/media/{{ asset.id }}/rename">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label class="field"><span>素材标题</span><input name="title" maxlength="200" required value="{{ asset.title }}"></label>
+    <button class="btn btn-secondary" type="submit">修改标题</button>
+  </form>
+  {% if asset.error_message %}<div class="alert alert-error">{{ asset.error_message }}</div>{% endif %}
+  {% if asset.status == 'ready' %}
+    <div class="alert alert-success">视频已完成转码，可返回课程管理绑定课节。</div>
+  {% else %}
+    <label class="drop-zone" for="video-file"><strong>选择一个视频文件</strong><span>建议上传清晰源文件；系统将在腾讯云生成 720p/480p/360p 自适应 HLS。</span><input id="video-file" type="file" accept="video/*"></label>
+    <div class="progress-track" aria-label="上传进度"><span id="upload-progress"></span></div>
+    <p id="upload-message" class="form-help">选择文件后点击开始上传。关闭页面不会影响已经进入 VOD 转码的任务。</p>
+    <button id="upload-button" class="btn btn-primary" type="button">开始直传</button>
+  {% endif %}
+</div>
+{% endblock %}
+{% block scripts %}
+{% if asset.status != 'ready' %}
+<script src="https://imgcache.qq.com/open/qcloud/js/vod/sdk/ugcUploader.js"></script>
+<script>
+(() => {
+  const root = document.querySelector('.upload-card');
+  const assetId = root.dataset.assetId;
+  const button = document.getElementById('upload-button');
+  const fileInput = document.getElementById('video-file');
+  const message = document.getElementById('upload-message');
+  const progress = document.getElementById('upload-progress');
+  const badge = document.getElementById('asset-status');
+  let pollTimer;
+
+  const setMessage = (text, isError = false) => {
+    message.textContent = text;
+    message.classList.toggle('danger-text', isError);
+  };
+  const pollStatus = () => {
+    clearInterval(pollTimer);
+    pollTimer = setInterval(async () => {
+      const response = await fetch(`/admin/media/${assetId}/status`, {credentials: 'same-origin'});
+      if (!response.ok) return;
+      const result = await response.json();
+      badge.textContent = ({pending_upload:'待上传', processing:'转码中', ready:'已就绪', failed:'失败'})[result.status] || result.status;
+      if (result.status === 'ready') {
+        clearInterval(pollTimer);
+        badge.className = 'badge badge-success';
+        setMessage('转码完成，现在可以返回课程管理绑定课节。');
+      } else if (result.status === 'failed') {
+        clearInterval(pollTimer);
+        badge.className = 'badge badge-danger';
+        setMessage(result.error_message || '转码失败，请返回列表重试。', true);
+      }
+    }, 5000);
+  };
+
+  button.addEventListener('click', () => {
+    const videoFile = fileInput.files[0];
+    if (!videoFile) return setMessage('请先选择视频文件。', true);
+    if (!window.qcVideo || !window.qcVideo.ugcUploader) return setMessage('腾讯云上传组件加载失败，请刷新页面重试。', true);
+    button.disabled = true;
+    setMessage('正在获取一次性上传凭证…');
+    window.qcVideo.ugcUploader.start({
+      videoFile,
+      getSignature(callback) {
+        fetch(`/admin/media/${assetId}/upload-signature`, {credentials: 'same-origin'})
+          .then(async response => {
+            const body = await response.json();
+            if (!response.ok) throw new Error(body.detail || '上传凭证获取失败');
+            callback(body.signature);
+          })
+          .catch(error => { button.disabled = false; setMessage(error.message, true); });
+      },
+      progress(result) {
+        const percent = Math.max(0, Math.min(100, Math.round((result.curr || 0) * 100)));
+        progress.style.width = `${percent}%`;
+        setMessage(`正在直传腾讯云：${percent}%`);
+      },
+      error(result) {
+        button.disabled = false;
+        setMessage(result.msg || '上传失败，请重试。', true);
+      },
+      finish() {
+        progress.style.width = '100%';
+        badge.textContent = '转码中';
+        setMessage('上传完成，腾讯云正在转码。此过程通常需要几分钟。');
+        pollStatus();
+      }
+    });
+  });
+  if ({{ 'true' if asset.status == 'processing' else 'false' }}) pollStatus();
+})();
+</script>
+{% endif %}
+{% endblock %}
