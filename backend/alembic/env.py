@@ -2,6 +2,7 @@ from logging.config import fileConfig
 
 from alembic import context
 
+import backend.app.models  # noqa: F401,E402
 from backend.app.config import get_settings
 from backend.app.db import Base
 
@@ -37,4 +38,3 @@ if context.is_offline_mode():
     run_migrations_offline()
 else:
     run_migrations_online()
-

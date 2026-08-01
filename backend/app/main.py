@@ -1,15 +1,29 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
 from backend.app.config import get_settings
+from backend.app.db import Base, get_engine
 from backend.app.health import router as health_router
+from backend.app.modules.admin.auth import bootstrap_admin
+from backend.app.modules.admin.router import router as admin_router
+
+APP_DIR = Path(__file__).resolve().parent
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    settings = get_settings()
+    if settings.app_env in {"development", "test"}:
+        # Production always runs Alembic before starting the API.
+        import backend.app.models  # noqa: F401
+
+        Base.metadata.create_all(bind=get_engine())
+    bootstrap_admin()
     yield
 
 
@@ -23,7 +37,18 @@ def create_app() -> FastAPI:
         same_site="lax",
         max_age=8 * 60 * 60,
     )
+    application.mount("/static", StaticFiles(directory=APP_DIR / "static"), name="static")
     application.include_router(health_router)
+    application.include_router(admin_router)
+
+    @application.exception_handler(HTTPException)
+    async def admin_auth_redirect(request: Request, exc: HTTPException):
+        if exc.status_code == 401 and request.url.path.startswith("/admin"):
+            target = f"/admin/login?next={request.url.path}"
+            return RedirectResponse(target, status_code=303)
+        from fastapi.exception_handlers import http_exception_handler
+
+        return await http_exception_handler(request, exc)
 
     @application.get("/", include_in_schema=False)
     def root() -> RedirectResponse:
@@ -33,4 +58,3 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
-

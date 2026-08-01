@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>登录 - 分身交付平台</title>
+  <link rel="stylesheet" href="/static/admin.css">
+</head>
+<body class="login-body">
+  <main class="login-card">
+    <div class="login-brand"><span class="brand-mark">分</span></div>
+    <h1>分身交付平台</h1>
+    <p>登录管理后台</p>
+    {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+    <form method="post" action="/admin/login" class="form-stack">
+      <input type="hidden" name="next_url" value="{{ next_url }}">
+      <label>用户名<input name="username" autocomplete="username" required></label>
+      <label>密码<input name="password" type="password" autocomplete="current-password" required></label>
+      <button class="btn btn-primary btn-block" type="submit">登录</button>
+    </form>
+  </main>
+</body>
+</html>
+

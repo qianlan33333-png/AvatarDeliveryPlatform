@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}分身交付平台{% endblock %}</title>
+  <link rel="stylesheet" href="/static/admin.css">
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <div class="admin-layout">
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="brand-mark">分</span>
+        <div>
+          <strong>分身交付平台</strong>
+          <small>管理后台</small>
+        </div>
+      </div>
+      <nav class="nav-list" aria-label="后台导航">
+        <a class="nav-item {{ 'active' if request.url.path.startswith('/admin/users') else '' }}" href="/admin/users">用户管理</a>
+        <a class="nav-item {{ 'active' if request.url.path.startswith('/admin/courses') else '' }}" href="/admin/courses">课程管理</a>
+        <a class="nav-item {{ 'active' if request.url.path.startswith('/admin/media') else '' }}" href="/admin/media">视频素材</a>
+        <a class="nav-item {{ 'active' if request.url.path.startswith('/admin/entitlements') else '' }}" href="/admin/entitlements">开通记录</a>
+        <a class="nav-item {{ 'active' if request.url.path.startswith('/admin/llm-config') else '' }}" href="/admin/llm-config">模型配置</a>
+      </nav>
+      <form class="sidebar-footer" method="post" action="/admin/logout">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <span>{{ admin.username }}</span>
+        <button class="link-button" type="submit">退出</button>
+      </form>
+    </aside>
+    <main class="main-content">
+      <header class="page-header">
+        <h1>{% block page_title %}{% endblock %}</h1>
+        {% block page_action %}{% endblock %}
+      </header>
+      <section class="page-body">
+        {% block content %}{% endblock %}
+      </section>
+    </main>
+  </div>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
+

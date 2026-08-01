@@ -1,0 +1,40 @@
+{% extends "admin/base.html" %}
+{% block title %}用户管理 - 分身交付平台{% endblock %}
+{% block page_title %}用户管理{% endblock %}
+{% block content %}
+<form class="toolbar" method="get" action="/admin/users">
+  <input class="search-input" name="keyword" value="{{ keyword }}" placeholder="搜索昵称、用户ID或手机号后四位">
+  <button class="btn btn-secondary" type="submit">搜索</button>
+  {% if keyword %}<a class="btn btn-ghost" href="/admin/users">清除</a>{% endif %}
+</form>
+<div class="table-card">
+  <table class="data-table">
+    <thead><tr><th>用户</th><th>手机号</th><th>注册时间</th><th>最后登录</th><th>状态</th><th>操作</th></tr></thead>
+    <tbody>
+    {% for user in users %}
+      <tr>
+        <td><strong>{{ user.nickname or '未命名用户' }}</strong><small class="subline">{{ user.id }}</small></td>
+        <td>{{ ('****' ~ user.phone_last4) if user.phone_last4 else '未绑定' }}</td>
+        <td>{{ user.created_at.strftime('%Y-%m-%d %H:%M') if user.created_at else '-' }}</td>
+        <td>{{ user.last_login_at.strftime('%Y-%m-%d %H:%M') if user.last_login_at else '-' }}</td>
+        <td><span class="badge {{ 'badge-success' if user.is_active else 'badge-muted' }}">{{ '正常' if user.is_active else '已禁用' }}</span></td>
+        <td>
+          <form method="post" action="/admin/users/{{ user.id }}/toggle">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button class="btn btn-small {{ 'btn-danger' if user.is_active else 'btn-secondary' }}" type="submit">{{ '禁用' if user.is_active else '启用' }}</button>
+          </form>
+        </td>
+      </tr>
+    {% else %}
+      <tr><td colspan="6"><div class="empty-state">暂无用户</div></td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+<nav class="pagination" aria-label="分页">
+  {% if page > 1 %}<a class="btn btn-ghost" href="?page={{ page - 1 }}&keyword={{ encoded_keyword }}">上一页</a>{% endif %}
+  <span>第 {{ page }} 页</span>
+  {% if has_next %}<a class="btn btn-ghost" href="?page={{ page + 1 }}&keyword={{ encoded_keyword }}">下一页</a>{% endif %}
+</nav>
+{% endblock %}
+
