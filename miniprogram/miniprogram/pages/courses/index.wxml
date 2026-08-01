@@ -1,0 +1,25 @@
+<view class="screen courses-page">
+  <view class="intro-card surface-card">
+    <text class="eyebrow">全部课程</text>
+    <text class="section-title">看得见，也知道为什么适合你</text>
+    <text class="section-copy">全部课程都会展示。未购买课程可查看简介和试听，开通后即可继续学习。</text>
+  </view>
+
+  <view class="list-heading">
+    <text class="list-title">课程列表</text>
+    <text class="list-meta">0 门</text>
+  </view>
+
+  <view class="empty-card surface-card">
+    <view class="empty-symbol">课</view>
+    <text class="empty-title">还没有已发布课程</text>
+    <text class="empty-copy">在管理后台完成视频转码、绑定课节并发布后，课程会自动出现在这里。</text>
+    <view class="state-row">
+      <text class="state-tag">可见</text>
+      <text class="state-separator">·</text>
+      <text class="state-tag">锁定</text>
+      <text class="state-separator">·</text>
+      <text class="state-tag">可试听</text>
+    </view>
+  </view>
+</view>

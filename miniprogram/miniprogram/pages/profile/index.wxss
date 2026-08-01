@@ -1,0 +1,116 @@
+.profile-page {
+  padding-bottom: calc(44rpx + constant(safe-area-inset-bottom));
+  padding-bottom: calc(44rpx + env(safe-area-inset-bottom));
+}
+
+.identity-card {
+  padding: 34rpx 32rpx;
+  display: flex;
+  align-items: center;
+}
+
+.avatar-placeholder {
+  width: 104rpx;
+  height: 104rpx;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 34rpx;
+  background: #f5d060;
+  color: #2d2d2d;
+  font-size: 38rpx;
+  font-weight: 800;
+}
+
+.identity-copy {
+  min-width: 0;
+  margin-left: 26rpx;
+}
+
+.identity-title {
+  display: block;
+  color: #34312c;
+  font-size: 32rpx;
+  font-weight: 700;
+}
+
+.identity-subtitle {
+  display: block;
+  margin-top: 10rpx;
+  color: #847d72;
+  font-size: 25rpx;
+  line-height: 1.5;
+}
+
+.summary-grid {
+  margin-top: 24rpx;
+  display: flex;
+  gap: 24rpx;
+}
+
+.summary-card {
+  min-width: 0;
+  flex: 1;
+  padding: 30rpx 28rpx;
+}
+
+.summary-value {
+  display: block;
+  color: #2d2d2d;
+  font-size: 44rpx;
+  font-weight: 800;
+}
+
+.summary-label {
+  display: block;
+  margin-top: 8rpx;
+  color: #817a6e;
+  font-size: 24rpx;
+}
+
+.entitlement-card {
+  margin-top: 24rpx;
+  padding: 34rpx 32rpx;
+}
+
+.entitlement-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.entitlement-title {
+  color: #36332e;
+  font-size: 30rpx;
+  font-weight: 700;
+}
+
+.entitlement-state {
+  padding: 8rpx 16rpx;
+  border-radius: 20rpx;
+  background: #f7f1df;
+  color: #9a7200;
+  font-size: 22rpx;
+}
+
+.entitlement-copy {
+  display: block;
+  margin-top: 22rpx;
+  color: #817a6e;
+  font-size: 26rpx;
+  line-height: 1.65;
+}
+
+.bind-button {
+  width: 100%;
+  margin-top: 32rpx;
+}
+
+.privacy-note {
+  display: block;
+  margin-top: 28rpx;
+  color: #a39d91;
+  font-size: 23rpx;
+  text-align: center;
+}

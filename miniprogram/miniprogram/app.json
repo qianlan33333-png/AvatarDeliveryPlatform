@@ -1,0 +1,41 @@
+{
+  "pages": [
+    "pages/chat/index",
+    "pages/courses/index",
+    "pages/profile/index"
+  ],
+  "window": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "分身交付平台",
+    "navigationBarBackgroundColor": "#FDF8E7",
+    "backgroundColor": "#FDF8E7",
+    "backgroundTextStyle": "dark"
+  },
+  "tabBar": {
+    "color": "#7A7364",
+    "selectedColor": "#9A7200",
+    "backgroundColor": "#FFFDF7",
+    "borderStyle": "white",
+    "list": [
+      {
+        "pagePath": "pages/chat/index",
+        "text": "聊聊"
+      },
+      {
+        "pagePath": "pages/courses/index",
+        "text": "课程"
+      },
+      {
+        "pagePath": "pages/profile/index",
+        "text": "我的"
+      }
+    ]
+  },
+  "networkTimeout": {
+    "request": 10000,
+    "connectSocket": 10000
+  },
+  "style": "v2",
+  "componentFramework": "glass-easel",
+  "lazyCodeLoading": "requiredComponents"
+}

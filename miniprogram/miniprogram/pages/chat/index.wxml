@@ -1,0 +1,44 @@
+<view class="chat-page">
+  <scroll-view class="chat-scroll" scroll-y show-scrollbar="{{false}}">
+    <view class="chat-content">
+      <view class="welcome-card surface-card">
+        <view class="assistant-mark">AI</view>
+        <view class="welcome-copy">
+          <text class="eyebrow">课程助手</text>
+          <text class="section-title">今天想了解什么？</text>
+          <text class="section-copy">可以问课程方向、适合人群和学习建议。涉及课程时，只会从已发布课程中给你推荐。</text>
+        </view>
+      </view>
+
+      <view class="prompt-section">
+        <text class="prompt-label">你可以这样问</text>
+        <view class="prompt-list">
+          <view class="prompt-chip">有没有适合新手的课程？</view>
+          <view class="prompt-chip">我想提升内容表达能力</view>
+          <view class="prompt-chip">帮我比较两门课程</view>
+        </view>
+      </view>
+
+      <view class="status-note">
+        <view class="status-dot"></view>
+        <text>本地页面已就绪，接入身份与问答接口后开放发送</text>
+      </view>
+    </view>
+  </scroll-view>
+
+  <view class="composer safe-area-bottom">
+    <textarea
+      class="composer-input"
+      value="{{draft}}"
+      maxlength="{{maxLength}}"
+      auto-height
+      confirm-type="send"
+      show-confirm-bar="{{false}}"
+      placeholder="输入你想问的问题"
+      placeholder-class="composer-placeholder"
+      bindinput="onDraftInput"
+      bindconfirm="onSend"
+    />
+    <button class="send-button {{draft ? 'is-ready' : ''}}" bindtap="onSend">发送</button>
+  </view>
+</view>

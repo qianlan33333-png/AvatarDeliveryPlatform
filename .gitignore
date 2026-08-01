@@ -14,5 +14,6 @@ build/
 postgres-data/
 redis-data/
 backups/
+miniprogram/node_modules/
+miniprogram/miniprogram_npm/
 miniprogram/project.private.config.json
-
