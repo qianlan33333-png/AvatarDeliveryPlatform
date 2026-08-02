@@ -1,5 +1,7 @@
 FROM python:3.12-slim AS runtime
 
+ARG PIP_INDEX_URL=https://mirrors.cloud.tencent.com/pypi/simple
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
@@ -9,7 +11,7 @@ RUN addgroup --system avatar && adduser --system --ingroup avatar avatar
 
 COPY pyproject.toml README.md alembic.ini ./
 COPY backend ./backend
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir --index-url "$PIP_INDEX_URL" .
 
 USER avatar
 
