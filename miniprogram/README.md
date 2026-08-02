@@ -17,7 +17,7 @@
 
 - 正式 AppID 保存在 `project.config.json`。
 - AppSecret、VOD SecretKey、模型 API Key 等服务端密钥禁止写入小程序或提交 Git。
-- 体验版和正式版 API 均预留为 `https://avatar.youcangogogo.com/api/v1`。
+- 体验版和正式版 API 均使用 `https://www.qianlan333.cloud/api/v1`。
 
 ## 校验
 

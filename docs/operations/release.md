@@ -4,9 +4,9 @@
 
 以下条件必须同时满足：
 
-- `avatar.youcangogogo.com` 已备案并解析到 `49.232.57.128`；
+- `www.qianlan333.cloud` 已备案并解析到 `49.232.57.128`；
 - 服务器经只读检查确认不存在 AI-CRM 或 HuangYouCanAI 代码、数据库、队列和网关配置；
-- HTTPS 证书有效，`https://avatar.youcangogogo.com/health` 正常；
+- HTTPS 证书有效，`https://www.qianlan333.cloud/health` 正常；
 - 微信小程序 AppID 为 `wx318698f4c753111e`，AppSecret 只保存在服务器密钥环境；
 - 腾讯云 VOD 已开通，自适应 HLS 任务流、回调令牌和播放域名已配置；
 - 生产 `.env` 已替换所有 `replace-*` 值，且没有提交到 Git；
@@ -29,9 +29,9 @@
 ## 3. 服务器发布
 
 1. 在 `/srv/avatar-delivery/releases/<git-sha>` 解压或检出对应版本。
-2. 将生产 `.env` 放在 `/srv/avatar-delivery/shared/.env`，权限设为仅服务账号可读。
+2. 首次部署运行 `deploy/bootstrap-runtime-env.sh /srv/avatar-delivery/shared/runtime.env <git-sha>` 生成内部密钥；密钥文件权限必须为 `600`。
 3. 构建标记为精确 Git SHA 的镜像。
-4. 执行 `alembic upgrade head`，再启动 API、Worker、PostgreSQL、Redis 和 Nginx。
+4. 运行 `deploy/release.sh <absolute-release-dir> <git-sha>`；脚本会先启动 PostgreSQL/Redis、执行 Alembic，再替换 API/Worker。
 5. 验证 `/health`、后台登录、微信登录、课程列表、播放准入、webhook 幂等和飞书告警。
 6. 只有新版本健康时才切换 Nginx；保留上一个镜像 SHA 和当前数据库备份。
 
@@ -42,7 +42,7 @@
 登录微信公众平台小程序后：
 
 1. 在开发管理中确认 AppID 和开发者权限。
-2. 将 `https://avatar.youcangogogo.com` 加入 `request` 合法域名。
+2. 将 `https://www.qianlan333.cloud` 加入 `request` 合法域名。
 3. 按实际 VOD/CDN 播放链接，将其 HTTPS 域名加入平台要求的媒体或下载域名白名单。
 4. 配置服务类目、小程序名称、图标、简介、客服方式、用户隐私保护指引和小程序备案。
 5. 在隐私保护指引中如实声明手机号、学习进度、对话内容和必要设备标识的处理目的。

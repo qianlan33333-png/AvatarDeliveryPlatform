@@ -33,7 +33,7 @@ ruff check backend tests
 
 小程序正式版不使用本地的 `127.0.0.1` 接口。发布顺序固定为：
 
-1. 将 `avatar.youcangogogo.com` 解析到业务服务器，完成 HTTPS；
+1. 将 `www.qianlan333.cloud` 解析到业务服务器，完成 HTTPS；
 2. 在服务器安全配置微信、VOD、模型、webhook 和飞书密钥；
 3. 部署精确代码版本，执行数据库迁移并通过健康检查；
 4. 在微信公众平台配置服务器合法域名和隐私合规信息；

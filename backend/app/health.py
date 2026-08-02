@@ -45,5 +45,10 @@ def health() -> dict[str, Any]:
         "environment": settings.app_env,
         "database": database_detail,
         "redis": redis_detail,
+        "integrations": {
+            "wechat": bool(settings.wechat_app_id and settings.wechat_app_secret),
+            "vod": bool(settings.tencent_vod_secret_id and settings.tencent_vod_secret_key),
+            "entitlement_webhook": bool(settings.entitlement_webhook_secret),
+            "feishu_alert": bool(settings.feishu_alert_webhook),
+        },
     }
-

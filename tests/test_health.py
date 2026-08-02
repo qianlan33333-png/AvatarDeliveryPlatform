@@ -12,6 +12,7 @@ def test_health_reports_service_and_database() -> None:
     assert body["service"] == "avatar-delivery-platform"
     assert body["database"] == "ok"
     assert body["redis"].startswith(("ok", "optional:"))
+    assert body["integrations"]["entitlement_webhook"] is True
 
 
 def test_root_redirects_to_admin() -> None:
@@ -19,4 +20,3 @@ def test_root_redirects_to_admin() -> None:
 
     assert response.status_code == 307
     assert response.headers["location"] == "/admin"
-
