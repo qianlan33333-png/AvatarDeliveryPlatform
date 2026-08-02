@@ -139,6 +139,7 @@ def test_vod_upload_signature_matches_tencent_algorithm() -> None:
     assert digest == expected
     assert original == signature.original
     assert "secretId=secret-id" in original
+    assert "sourceContext=%7B%22asset_id%22%3A%22asset-1%22%7D" in original
     assert "sessionContext=%7B%22asset_id%22%3A%22asset-1%22%7D" in original
     assert signature.expires_at == 1_700_000_600
 

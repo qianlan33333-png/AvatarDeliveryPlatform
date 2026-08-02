@@ -46,6 +46,9 @@ def build_upload_signature(
         "expireTime": expires_at,
         "random": nonce,
         "oneTimeValid": 1,
+        # Upload-complete callbacks return SourceContext while task-flow callbacks
+        # return SessionContext. Set both so either event can find the local asset.
+        "sourceContext": session_context,
         "sessionContext": session_context,
     }
     if sub_app_id:

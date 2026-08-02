@@ -23,7 +23,7 @@
 {% endblock %}
 {% block scripts %}
 {% if asset.status != 'ready' %}
-<script src="https://imgcache.qq.com/open/qcloud/js/vod/sdk/ugcUploader.js"></script>
+<script src="https://cdn-go.cn/cdn/vod-js-sdk-v6/latest/vod-js-sdk-v6.js"></script>
 <script>
 (() => {
   const root = document.querySelector('.upload-card');
@@ -58,39 +58,38 @@
     }, 5000);
   };
 
-  button.addEventListener('click', () => {
+  const getSignature = async () => {
+    const response = await fetch(`/admin/media/${assetId}/upload-signature`, {
+      credentials: 'same-origin'
+    });
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.detail || '上传凭证获取失败');
+    return body.signature;
+  };
+
+  button.addEventListener('click', async () => {
     const videoFile = fileInput.files[0];
     if (!videoFile) return setMessage('请先选择视频文件。', true);
-    if (!window.qcVideo || !window.qcVideo.ugcUploader) return setMessage('腾讯云上传组件加载失败，请刷新页面重试。', true);
+    if (!window.TcVod || !window.TcVod.default) return setMessage('腾讯云上传组件加载失败，请刷新页面重试。', true);
     button.disabled = true;
     setMessage('正在获取一次性上传凭证…');
-    window.qcVideo.ugcUploader.start({
-      videoFile,
-      getSignature(callback) {
-        fetch(`/admin/media/${assetId}/upload-signature`, {credentials: 'same-origin'})
-          .then(async response => {
-            const body = await response.json();
-            if (!response.ok) throw new Error(body.detail || '上传凭证获取失败');
-            callback(body.signature);
-          })
-          .catch(error => { button.disabled = false; setMessage(error.message, true); });
-      },
-      progress(result) {
-        const percent = Math.max(0, Math.min(100, Math.round((result.curr || 0) * 100)));
+    try {
+      const tcVod = new window.TcVod.default({getSignature});
+      const uploader = tcVod.upload({mediaFile: videoFile});
+      uploader.on('media_progress', info => {
+        const percent = Math.max(0, Math.min(100, Math.round((info.percent || 0) * 100)));
         progress.style.width = `${percent}%`;
         setMessage(`正在直传腾讯云：${percent}%`);
-      },
-      error(result) {
-        button.disabled = false;
-        setMessage(result.msg || '上传失败，请重试。', true);
-      },
-      finish() {
-        progress.style.width = '100%';
-        badge.textContent = '转码中';
-        setMessage('上传完成，腾讯云正在转码。此过程通常需要几分钟。');
-        pollStatus();
-      }
-    });
+      });
+      await uploader.done();
+      progress.style.width = '100%';
+      badge.textContent = '转码中';
+      setMessage('上传完成，腾讯云正在转码。此过程通常需要几分钟。');
+      pollStatus();
+    } catch (error) {
+      button.disabled = false;
+      setMessage(error && error.message ? error.message : '上传失败，请重试。', true);
+    }
   });
   if ({{ 'true' if asset.status == 'processing' else 'false' }}) pollStatus();
 })();

@@ -57,6 +57,8 @@ ruff check backend tests
 
 配置 `.env` 中的 `TENCENT_VOD_SECRET_ID`、`TENCENT_VOD_SECRET_KEY`、转码任务流和回调令牌。后台先创建素材记录，再由浏览器使用一次性签名直传 VOD。
 
+从腾讯云控制台开通应用、创建 HLS 任务流、CAM 子用户、回调到小程序真机验证的完整步骤见 [腾讯云 VOD 最小闭环配置](docs/integrations/tencent-vod-minimum-loop.md)。
+
 VOD 普通回调地址使用：
 
 ```text
