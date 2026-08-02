@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import threading
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from urllib.parse import quote
 
@@ -9,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.alerts import send_feishu_alert
 from backend.app.config import Settings, get_settings
-from backend.app.models import Lesson, PlaybackLease, User
+from backend.app.models import Course, LearningProgress, Lesson, PlaybackLease, User
 from backend.app.modules.entitlements.service import user_has_course_access
 from backend.app.security import issue_scoped_token, load_scoped_token
 
@@ -24,6 +25,17 @@ class PlaybackAdmissionError(ValueError):
         self.online_count = online_count
 
 
+@dataclass(frozen=True)
+class CourseProgressSummary:
+    lesson_count: int
+    completed_lesson_count: int
+    progress_percent: int
+    current_lesson_id: str | None
+    current_lesson_title: str
+    current_lesson_number: int | None
+    has_started: bool
+
+
 def _utc(value: datetime) -> datetime:
     if value.tzinfo is None:
         return value.replace(tzinfo=UTC)
@@ -34,6 +46,84 @@ def lesson_can_be_viewed(db: Session, user: User | None, lesson: Lesson) -> bool
     if lesson.is_preview:
         return True
     return bool(user and user_has_course_access(db, user.id, lesson.course_id))
+
+
+def published_course_lessons(course: Course) -> list[Lesson]:
+    return sorted(
+        (lesson for lesson in course.lessons if lesson.status == "published"),
+        key=lambda lesson: (lesson.sort_order, lesson.id),
+    )
+
+
+def load_progress_by_lesson(
+    db: Session,
+    *,
+    user_id: str | None,
+    lesson_ids: list[str],
+) -> dict[str, LearningProgress]:
+    if not user_id or not lesson_ids:
+        return {}
+    return {
+        progress.lesson_id: progress
+        for progress in db.scalars(
+            select(LearningProgress).where(
+                LearningProgress.user_id == user_id,
+                LearningProgress.lesson_id.in_(lesson_ids),
+            )
+        )
+    }
+
+
+def summarize_course_progress(
+    course: Course,
+    progress_by_lesson: dict[str, LearningProgress],
+) -> CourseProgressSummary:
+    lessons = published_course_lessons(course)
+    completed_lesson_count = sum(
+        1
+        for lesson in lessons
+        if (progress := progress_by_lesson.get(lesson.id)) and progress.completed
+    )
+    progress_percent = (
+        completed_lesson_count * 100 // len(lessons) if lessons else 0
+    )
+    started = [
+        (number, lesson, progress)
+        for number, lesson in enumerate(lessons, start=1)
+        if (progress := progress_by_lesson.get(lesson.id))
+        and (progress.completed or progress.position_seconds > 0)
+    ]
+    if not started:
+        return CourseProgressSummary(
+            lesson_count=len(lessons),
+            completed_lesson_count=completed_lesson_count,
+            progress_percent=progress_percent,
+            current_lesson_id=None,
+            current_lesson_title="",
+            current_lesson_number=None,
+            has_started=False,
+        )
+
+    fallback_time = datetime.min.replace(tzinfo=UTC)
+    number, lesson, _ = max(
+        started,
+        key=lambda item: (
+            _utc(item[2].updated_at or item[2].created_at)
+            if (item[2].updated_at or item[2].created_at)
+            else fallback_time,
+            item[1].sort_order,
+            item[1].id,
+        ),
+    )
+    return CourseProgressSummary(
+        lesson_count=len(lessons),
+        completed_lesson_count=completed_lesson_count,
+        progress_percent=progress_percent,
+        current_lesson_id=lesson.id,
+        current_lesson_title=lesson.title,
+        current_lesson_number=number,
+        has_started=True,
+    )
 
 
 def _lock_admission_capacity(db: Session) -> None:

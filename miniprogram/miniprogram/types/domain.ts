@@ -37,6 +37,12 @@ export interface CourseSummary {
   keywords: string[]
   lesson_count: number
   preview_lesson_count: number
+  completed_lesson_count: number
+  progress_percent: number
+  current_lesson_id: string | null
+  current_lesson_title: string
+  current_lesson_number: number | null
+  has_started: boolean
   has_access: boolean
   locked: boolean
 }

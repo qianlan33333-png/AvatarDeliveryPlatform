@@ -24,7 +24,10 @@ from backend.app.modules.learning.service import (
     admit_playback,
     heartbeat_playback,
     lesson_can_be_viewed,
+    load_progress_by_lesson,
+    published_course_lessons,
     resolve_playback_redirect,
+    summarize_course_progress,
 )
 from backend.app.security import SecurityValueError
 
@@ -61,7 +64,13 @@ def _active_course_ids(db: DBSession, user_id: str | None) -> set[str]:
     }
 
 
-def _course_summary(course: Course, has_access: bool) -> dict[str, object]:
+def _course_summary(
+    course: Course,
+    has_access: bool,
+    progress_by_lesson: dict[str, LearningProgress],
+) -> dict[str, object]:
+    lessons = published_course_lessons(course)
+    progress = summarize_course_progress(course, progress_by_lesson)
     return {
         "id": course.id,
         "title": course.title,
@@ -69,8 +78,14 @@ def _course_summary(course: Course, has_access: bool) -> dict[str, object]:
         "description": course.description,
         "cover_url": course.cover_url,
         "keywords": course.keywords,
-        "lesson_count": len(course.lessons),
-        "preview_lesson_count": sum(1 for lesson in course.lessons if lesson.is_preview),
+        "lesson_count": progress.lesson_count,
+        "preview_lesson_count": sum(1 for lesson in lessons if lesson.is_preview),
+        "completed_lesson_count": progress.completed_lesson_count,
+        "progress_percent": progress.progress_percent,
+        "current_lesson_id": progress.current_lesson_id,
+        "current_lesson_title": progress.current_lesson_title,
+        "current_lesson_number": progress.current_lesson_number,
+        "has_started": progress.has_started,
         "has_access": has_access,
         "locked": not has_access,
     }
@@ -87,9 +102,22 @@ def list_courses(db: DBSession, user: OptionalCurrentUser):
         )
     )
     active_course_ids = _active_course_ids(db, user.id if user else None)
+    published_lesson_ids = [
+        lesson.id for course in courses for lesson in published_course_lessons(course)
+    ]
+    progress_by_lesson = load_progress_by_lesson(
+        db,
+        user_id=user.id if user else None,
+        lesson_ids=published_lesson_ids,
+    )
     return {
         "items": [
-            _course_summary(course, course.id in active_course_ids) for course in courses
+            _course_summary(
+                course,
+                course.id in active_course_ids,
+                progress_by_lesson,
+            )
+            for course in courses
         ]
     }
 
@@ -104,18 +132,14 @@ def course_detail(course_id: str, db: DBSession, user: OptionalCurrentUser):
     if not course:
         raise HTTPException(status_code=404, detail="course not found")
     has_access = course.id in _active_course_ids(db, user.id if user else None)
-    progress_by_lesson: dict[str, LearningProgress] = {}
-    if user:
-        progress_by_lesson = {
-            progress.lesson_id: progress
-            for progress in db.scalars(
-                select(LearningProgress).where(LearningProgress.user_id == user.id)
-            )
-        }
+    published_lessons = published_course_lessons(course)
+    progress_by_lesson = load_progress_by_lesson(
+        db,
+        user_id=user.id if user else None,
+        lesson_ids=[lesson.id for lesson in published_lessons],
+    )
     lessons = []
-    for lesson in course.lessons:
-        if lesson.status != "published":
-            continue
+    for lesson in published_lessons:
         can_access_lesson = has_access or lesson.is_preview
         progress = progress_by_lesson.get(lesson.id)
         lessons.append(
@@ -133,7 +157,10 @@ def course_detail(course_id: str, db: DBSession, user: OptionalCurrentUser):
                 "completed": progress.completed if progress else False,
             }
         )
-    return {**_course_summary(course, has_access), "lessons": lessons}
+    return {
+        **_course_summary(course, has_access, progress_by_lesson),
+        "lessons": lessons,
+    }
 
 
 @router.get("/lessons/{lesson_id}")
@@ -266,7 +293,7 @@ def update_progress(
         db.add(progress)
     duration = lesson.video_asset.duration_seconds if lesson.video_asset else 0
     progress.position_seconds = min(payload.position_seconds, duration) if duration else 0
-    progress.completed = payload.completed or (
+    progress.completed = progress.completed or payload.completed or (
         bool(duration) and progress.position_seconds >= max(duration - 10, 0)
     )
     db.commit()

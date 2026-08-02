@@ -1,15 +1,4 @@
 <view class="screen courses-page">
-  <view class="intro-card surface-card">
-    <text class="eyebrow">全部课程</text>
-    <text class="section-title">看得见，也知道为什么适合你</text>
-    <text class="section-copy">全部课程都会展示。未购买课程可查看简介和试听，开通后即可继续学习。</text>
-  </view>
-
-  <view class="list-heading">
-    <text class="list-title">课程列表</text>
-    <text class="list-meta">{{courses.length}} 门</text>
-  </view>
-
   <view wx:if="{{loading}}" class="state-card surface-card">
     <view class="loading-dot"></view>
     <text class="empty-title">正在加载课程</text>
@@ -23,20 +12,28 @@
   </view>
 
   <view wx:elif="{{courses.length}}" class="course-list">
-    <view wx:for="{{courses}}" wx:key="id" class="course-card surface-card" data-id="{{item.id}}" bindtap="openCourse">
+    <view
+      wx:for="{{courses}}"
+      wx:key="id"
+      class="course-card"
+      data-id="{{item.id}}"
+      bindtap="openCourse"
+      hover-class="course-card-active"
+      aria-role="button"
+      aria-label="查看课程 {{item.title}}"
+    >
       <view class="course-cover">
         <image wx:if="{{item.cover_url}}" class="course-cover-image" src="{{item.cover_url}}" mode="aspectFill" lazy-load></image>
-        <view wx:else class="course-cover-fallback"><text>课</text></view>
-        <view class="course-badge {{item.has_access ? 'unlocked' : 'locked'}}">{{item.has_access ? '已开通' : '可试听'}}</view>
+        <image wx:else class="course-cover-image" src="/assets/course-cover-fallback.png" mode="aspectFill"></image>
       </view>
       <view class="course-body">
         <text class="course-title">{{item.title}}</text>
-        <text wx:if="{{item.subtitle}}" class="course-subtitle">{{item.subtitle}}</text>
-        <text class="course-description">{{item.description}}</text>
+        <text class="course-learning">{{item.learning_text}}</text>
         <view class="course-footer">
-          <text>{{item.lesson_count}} 个课节</text>
-          <text wx:if="{{item.preview_lesson_count}}">{{item.preview_lesson_count}} 节试听</text>
-          <text class="course-action">{{item.has_access ? '继续学习' : '查看课程'}} ›</text>
+          <text>共 {{item.lesson_count}} 讲</text>
+          <text class="meta-divider">·</text>
+          <text class="course-progress-text">{{item.progress_text}}</text>
+          <text wx:if="{{!item.has_access}}" class="preview-pill">{{item.preview_lesson_count > 0 ? '可试听' : '未开通'}}</text>
         </view>
       </view>
     </view>
@@ -46,12 +43,5 @@
     <view class="empty-symbol">课</view>
     <text class="empty-title">还没有已发布课程</text>
     <text class="empty-copy">在管理后台完成视频转码、绑定课节并发布后，课程会自动出现在这里。</text>
-    <view class="state-row">
-      <text class="state-tag">可见</text>
-      <text class="state-separator">·</text>
-      <text class="state-tag">锁定</text>
-      <text class="state-separator">·</text>
-      <text class="state-tag">可试听</text>
-    </view>
   </view>
 </view>

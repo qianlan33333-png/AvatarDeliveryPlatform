@@ -5,46 +5,75 @@
     <button class="primary-button detail-retry" bindtap="loadCourse">重新加载</button>
   </view>
   <block wx:elif="{{course}}">
-    <view class="hero-card surface-card">
-      <image wx:if="{{course.cover_url}}" class="hero-cover" src="{{course.cover_url}}" mode="aspectFill"></image>
-      <view wx:else class="hero-cover hero-fallback">课</view>
-      <view class="hero-body">
-        <view class="access-row">
-          <text class="access-badge {{course.has_access ? 'open' : ''}}">{{course.has_access ? '已开通完整课程' : '可查看简介与试听'}}</text>
-          <text>{{course.lesson_count}} 个课节</text>
-        </view>
-        <text class="detail-title">{{course.title}}</text>
-        <text wx:if="{{course.subtitle}}" class="detail-subtitle">{{course.subtitle}}</text>
-        <text class="detail-description">{{course.description}}</text>
-        <button
-          wx:if="{{!course.has_access}}"
-          class="contact-button"
-          open-type="contact"
-          session-from="course:{{course.id}}"
-        >联系运营开通完整课程</button>
+    <view class="progress-card surface-card">
+      <text class="learning-position">{{course.learning_text}}</text>
+      <view class="progress-summary">
+        <text>共 {{course.lesson_count}} 讲</text>
+        <text class="progress-percent">已学 {{course.progress_percent}}%</text>
       </view>
+      <progress
+        class="course-progress"
+        percent="{{course.progress_percent}}"
+        stroke-width="4"
+        activeColor="#E1B82B"
+        backgroundColor="#ECE8DE"
+      ></progress>
     </view>
 
-    <view class="lesson-heading">
-      <text class="lesson-heading-title">课节目录</text>
-      <text class="lesson-heading-note">试听课节可直接播放</text>
+    <view wx:if="{{!course.has_access}}" class="locked-course-card surface-card">
+      <view class="locked-course-copy">
+        <text class="locked-course-title">{{course.preview_lesson_count > 0 ? '可查看介绍和试听课节' : '可查看课程介绍'}}</text>
+        <text class="locked-course-description">{{course.description}}</text>
+      </view>
+      <button
+        class="contact-button"
+        open-type="contact"
+        session-from="course:{{course.id}}"
+      >联系运营开通完整课程</button>
     </view>
-    <view class="lesson-list">
-      <view wx:for="{{course.lessons}}" wx:key="id" class="lesson-row surface-card {{item.locked ? 'locked' : ''}}" data-id="{{item.id}}" bindtap="openLesson">
-        <view class="lesson-order">{{index + 1}}</view>
-        <view class="lesson-copy">
-          <view class="lesson-title-row">
-            <text class="lesson-title">{{item.title}}</text>
-            <text wx:if="{{item.is_preview}}" class="preview-tag">试听</text>
-          </view>
-          <text wx:if="{{item.description}}" class="lesson-description">{{item.description}}</text>
+
+    <view class="lesson-panel surface-card">
+      <view class="lesson-toolbar">
+        <text class="lesson-heading-title">课节列表 · {{course.lesson_count}}</text>
+        <label class="lesson-filter">
+          <text>只看未学完</text>
+          <switch
+            checked="{{showIncompleteOnly}}"
+            disabled="{{!course.lessons.length}}"
+            color="#E1B82B"
+            bindchange="toggleIncomplete"
+          ></switch>
+        </label>
+      </view>
+
+      <view wx:if="{{visibleLessons.length}}" class="lesson-list">
+        <view
+          wx:for="{{visibleLessons}}"
+          wx:key="id"
+          class="lesson-row {{item.locked ? 'locked' : ''}}"
+          data-id="{{item.id}}"
+          bindtap="openLesson"
+          hover-class="lesson-row-active"
+          aria-role="button"
+          aria-label="第 {{item.lesson_number}} 讲 {{item.title}}"
+        >
+          <text class="lesson-title">第 {{item.lesson_number}} 讲｜{{item.title}}</text>
           <view class="lesson-meta">
-            <text>{{item.duration_text}}</text>
-            <text wx:if="{{item.completed}}">已学完</text>
-            <text wx:elif="{{item.position_seconds}}">已学 {{item.position_seconds}} 秒</text>
+            <text>{{item.study_text}}</text>
+            <text wx:if="{{item.is_preview}}" class="preview-tag">试听</text>
+            <text wx:if="{{item.locked}}" class="locked-tag">锁定</text>
           </view>
         </view>
-        <text class="lesson-action">{{item.locked ? '锁定' : '播放'}} ›</text>
+      </view>
+
+      <view wx:elif="{{showIncompleteOnly && course.lessons.length}}" class="lesson-empty">
+        <text class="lesson-empty-title">所有课节都学完了</text>
+        <button class="show-all-button" bindtap="showAllLessons">查看全部课节</button>
+      </view>
+
+      <view wx:else class="lesson-empty">
+        <text class="lesson-empty-title">暂时还没有课节</text>
+        <text class="lesson-empty-copy">课程发布课节后会显示在这里。</text>
       </view>
     </view>
   </block>

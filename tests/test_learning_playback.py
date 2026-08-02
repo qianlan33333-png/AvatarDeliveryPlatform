@@ -116,6 +116,11 @@ def test_visible_locked_course_preview_and_paid_lesson_access() -> None:
 
     assert guest_list.status_code == 200
     assert guest_list.json()["items"][0]["locked"] is True
+    assert guest_list.json()["items"][0]["lesson_count"] == 2
+    assert guest_list.json()["items"][0]["completed_lesson_count"] == 0
+    assert guest_list.json()["items"][0]["progress_percent"] == 0
+    assert guest_list.json()["items"][0]["has_started"] is False
+    assert guest_list.json()["items"][0]["current_lesson_id"] is None
     assert buyer_list.json()["items"][0]["has_access"] is True
     lessons = guest_detail.json()["lessons"]
     assert lessons[0]["locked"] is False
@@ -171,11 +176,181 @@ def test_playback_admit_redirect_heartbeat_and_progress() -> None:
         assert progress.status_code == 200
         assert progress.json()["completed"] is True
 
+        replayed = client.put(
+            f"/api/v1/learning-progress/{data['preview_lesson_id']}",
+            json={"position_seconds": 30, "completed": False},
+            headers=headers,
+        )
+        assert replayed.status_code == 200
+        assert replayed.json()["position_seconds"] == 30
+        assert replayed.json()["completed"] is True
+
     session_factory = get_session_factory()
     with session_factory() as db:
         saved = db.query(LearningProgress).one()
-        assert saved.position_seconds == 115
+        assert saved.position_seconds == 30
         assert saved.completed is True
+
+
+def test_course_progress_summary_uses_only_published_lessons_and_latest_activity() -> None:
+    now = datetime.now(UTC)
+    session_factory = get_session_factory()
+    with session_factory() as db:
+        course = Course(
+            title="进度展示课",
+            subtitle="列表与详情同口径",
+            description="用于验证课程级学习进度。",
+            cover_url="https://cdn.example.com/progress.jpg",
+            status="published",
+            sort_order=10,
+        )
+        empty_course = Course(
+            title="空课程",
+            description="兼容历史异常数据。",
+            status="published",
+            sort_order=20,
+        )
+        user = User(nickname="进度用户")
+        other_user = User(nickname="另一位进度用户")
+        db.add_all([course, empty_course, user, other_user])
+        db.flush()
+        first = Lesson(
+            course_id=course.id,
+            title="第一讲：已完成",
+            sort_order=10,
+            status="published",
+        )
+        second = Lesson(
+            course_id=course.id,
+            title="第二讲：学习中",
+            sort_order=20,
+            status="published",
+        )
+        third = Lesson(
+            course_id=course.id,
+            title="第三讲：未开始",
+            sort_order=30,
+            status="published",
+        )
+        draft = Lesson(
+            course_id=course.id,
+            title="草稿课节",
+            sort_order=40,
+            status="draft",
+        )
+        db.add_all([first, second, third, draft])
+        db.flush()
+        db.add_all(
+            [
+                CourseEntitlement(
+                    user_id=user.id,
+                    phone_hash="progress-user-phone-hash",
+                    course_id=course.id,
+                    status="active",
+                    effective_at=now - timedelta(minutes=30),
+                    expires_at=now + timedelta(days=30),
+                    source_order_id="order-progress-user",
+                ),
+                CourseEntitlement(
+                    user_id=other_user.id,
+                    phone_hash="other-progress-user-phone-hash",
+                    course_id=course.id,
+                    status="active",
+                    effective_at=now - timedelta(minutes=30),
+                    expires_at=now + timedelta(days=30),
+                    source_order_id="order-other-progress-user",
+                ),
+                LearningProgress(
+                    user_id=user.id,
+                    lesson_id=first.id,
+                    position_seconds=100,
+                    completed=True,
+                    created_at=now - timedelta(minutes=20),
+                    updated_at=now - timedelta(minutes=20),
+                ),
+                LearningProgress(
+                    user_id=user.id,
+                    lesson_id=second.id,
+                    position_seconds=45,
+                    completed=False,
+                    created_at=now - timedelta(minutes=10),
+                    updated_at=now - timedelta(minutes=10),
+                ),
+                LearningProgress(
+                    user_id=user.id,
+                    lesson_id=draft.id,
+                    position_seconds=100,
+                    completed=True,
+                    created_at=now - timedelta(minutes=5),
+                    updated_at=now - timedelta(minutes=5),
+                ),
+                LearningProgress(
+                    user_id=other_user.id,
+                    lesson_id=third.id,
+                    position_seconds=80,
+                    completed=True,
+                    created_at=now - timedelta(minutes=2),
+                    updated_at=now - timedelta(minutes=2),
+                ),
+            ]
+        )
+        db.commit()
+        course_id = course.id
+        empty_course_id = empty_course.id
+        user_id = user.id
+        other_user_id = other_user.id
+        second_id = second.id
+        third_id = third.id
+
+    with TestClient(app) as client:
+        course_list = client.get("/api/v1/courses", headers=_auth(user_id))
+        other_user_list = client.get(
+            "/api/v1/courses",
+            headers=_auth(other_user_id),
+        )
+        detail = client.get(f"/api/v1/courses/{course_id}", headers=_auth(user_id))
+        anonymous_list = client.get("/api/v1/courses")
+        empty_detail = client.get(f"/api/v1/courses/{empty_course_id}")
+
+    assert course_list.status_code == 200
+    summary = next(
+        item for item in course_list.json()["items"] if item["id"] == course_id
+    )
+    detail_body = detail.json()
+    for payload in (summary, detail_body):
+        assert payload["lesson_count"] == 3
+        assert payload["completed_lesson_count"] == 1
+        assert payload["progress_percent"] == 33
+        assert payload["has_started"] is True
+        assert payload["current_lesson_id"] == second_id
+        assert payload["current_lesson_title"] == "第二讲：学习中"
+        assert payload["current_lesson_number"] == 2
+    assert len(detail_body["lessons"]) == 3
+    assert all(item["title"] != "草稿课节" for item in detail_body["lessons"])
+
+    other_summary = next(
+        item for item in other_user_list.json()["items"] if item["id"] == course_id
+    )
+    assert other_summary["completed_lesson_count"] == 1
+    assert other_summary["progress_percent"] == 33
+    assert other_summary["current_lesson_id"] == third_id
+    assert other_summary["current_lesson_number"] == 3
+
+    anonymous = next(
+        item for item in anonymous_list.json()["items"] if item["id"] == course_id
+    )
+    assert anonymous["completed_lesson_count"] == 0
+    assert anonymous["progress_percent"] == 0
+    assert anonymous["has_started"] is False
+    assert anonymous["current_lesson_id"] is None
+
+    empty = empty_detail.json()
+    assert empty["lesson_count"] == 0
+    assert empty["completed_lesson_count"] == 0
+    assert empty["progress_percent"] == 0
+    assert empty["has_started"] is False
+    assert empty["current_lesson_id"] is None
+    assert empty["lessons"] == []
 
 
 def test_capacity_rejects_new_user_but_existing_lease_can_renew(monkeypatch) -> None:
