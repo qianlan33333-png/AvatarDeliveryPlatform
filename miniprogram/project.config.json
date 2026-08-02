@@ -20,7 +20,7 @@
     "ignoreUploadUnusedFiles": true,
     "compileHotReLoad": true,
     "skylineRenderEnable": false,
-    "es6": false,
+    "es6": true,
     "compileWorklet": false,
     "uglifyFileName": false,
     "uploadWithSourceMap": true,

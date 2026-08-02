@@ -51,10 +51,13 @@ export function request<TResponse>(options: RequestOptions): Promise<TResponse> 
   return new Promise<TResponse>((resolve, reject) => {
     wx.request({
       url: buildUrl(options.path),
-      method: options.method ?? 'GET',
+      method: options.method === undefined ? 'GET' : options.method,
       data: options.data,
       header: headers,
-      timeout: options.timeoutMs ?? runtimeConfig.requestTimeoutMs,
+      timeout:
+        options.timeoutMs === undefined
+          ? runtimeConfig.requestTimeoutMs
+          : options.timeoutMs,
       success: (response) => {
         if (response.statusCode >= 200 && response.statusCode < 300) {
           resolve(response.data as TResponse)

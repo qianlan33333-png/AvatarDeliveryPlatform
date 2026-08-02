@@ -132,7 +132,9 @@ Page({
   },
 
   onEnded() {
-    const duration = this.data.lesson?.duration_seconds || this.data.currentPosition
+    const duration = this.data.lesson
+      ? this.data.lesson.duration_seconds || this.data.currentPosition
+      : this.data.currentPosition
     this.setData({ currentPosition: duration })
     this.saveCurrentProgress(true)
   },

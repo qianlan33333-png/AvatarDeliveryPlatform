@@ -32,7 +32,9 @@ Page({
   },
 
   onUnload() {
-    activeStream?.abort()
+    if (activeStream !== null) {
+      activeStream.abort()
+    }
     activeStream = null
   },
 

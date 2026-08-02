@@ -7,7 +7,7 @@ interface RuntimeConfig {
 }
 
 const API_BASE_URLS: Record<RuntimeEnvironment, string> = {
-  develop: 'http://127.0.0.1:8080/api/v1',
+  develop: 'https://www.qianlan333.cloud/api/v1',
   trial: 'https://www.qianlan333.cloud/api/v1',
   release: 'https://www.qianlan333.cloud/api/v1',
 }
