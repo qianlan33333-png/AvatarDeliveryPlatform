@@ -24,6 +24,7 @@ from backend.app.modules.media.service import (
     first_recursive_value,
     playback_url_from,
     session_context_asset_id,
+    vod_task_failure_message,
 )
 from backend.app.web import templates
 
@@ -219,12 +220,17 @@ def _apply_callback(asset: VideoAsset, payload: dict[str, Any]) -> None:
     asset.provider_payload = payload
     if event_type == "NewFileUpload":
         asset.status = "processing"
-        asset.source_url = str(data.get("MediaUrl", ""))
-        asset.cover_url = str(data.get("CoverUrl", ""))
+        asset.source_url = str(first_recursive_value(data, {"MediaUrl"}) or "")
+        asset.cover_url = str(first_recursive_value(data, {"CoverUrl", "CoverURL"}) or "")
         return
     if event_type != "ProcedureStateChanged":
         return
     callback_status = str(data.get("Status", "")).upper()
+    nested_failure = vod_task_failure_message(data)
+    if nested_failure:
+        asset.status = "failed"
+        asset.error_message = nested_failure
+        return
     if callback_status in {"FAIL", "FAILED"}:
         asset.status = "failed"
         asset.error_message = str(

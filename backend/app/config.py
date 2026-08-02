@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     tencent_vod_secret_id: str = ""
     tencent_vod_secret_key: str = ""
     tencent_vod_sub_app_id: int = 0
-    tencent_vod_procedure: str = "avatarDeliveryAdaptiveHLS"
+    tencent_vod_procedure: str = "avatarDeliveryHLS"
     tencent_vod_storage_region: str = "ap-beijing"
     tencent_vod_callback_token: str = ""
 

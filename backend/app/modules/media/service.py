@@ -95,7 +95,7 @@ def event_data_for(payload: Mapping[str, Any]) -> Mapping[str, Any]:
 
 def session_context_asset_id(payload: Mapping[str, Any]) -> str:
     event_data = event_data_for(payload)
-    raw = event_data.get("SessionContext") or event_data.get("SourceContext") or ""
+    raw = first_recursive_value(event_data, {"SessionContext", "SourceContext"}) or ""
     if not isinstance(raw, str) or not raw:
         return ""
     try:
@@ -120,6 +120,26 @@ def first_recursive_value(value: Any, keys: set[str]) -> Any:
             if found not in (None, ""):
                 return found
     return None
+
+
+def vod_task_failure_message(value: Any) -> str:
+    if isinstance(value, Mapping):
+        status = str(value.get("Status", "")).upper()
+        if status in {"FAIL", "FAILED"}:
+            for key in ("Message", "ErrMsg", "ErrorMessage", "ErrCodeExt"):
+                if value.get(key):
+                    return str(value[key])
+            return "腾讯云 VOD 转码失败"
+        for child in value.values():
+            message = vod_task_failure_message(child)
+            if message:
+                return message
+    elif isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+        for child in value:
+            message = vod_task_failure_message(child)
+            if message:
+                return message
+    return ""
 
 
 def collect_recursive_urls(value: Any) -> list[str]:

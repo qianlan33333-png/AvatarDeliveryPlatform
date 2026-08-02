@@ -183,9 +183,11 @@ def test_vod_callbacks_are_idempotent_and_mark_asset_ready(monkeypatch) -> None:
         "EventType": "NewFileUpload",
         "FileUploadEvent": {
             "FileId": "vod-file-100",
-            "MediaUrl": "https://vod.example.com/source.mp4",
-            "CoverUrl": "https://vod.example.com/cover.jpg",
-            "SessionContext": session_context,
+            "MediaBasicInfo": {
+                "MediaUrl": "https://vod.example.com/source.mp4",
+                "CoverUrl": "https://vod.example.com/cover.jpg",
+                "SourceInfo": {"SourceContext": session_context},
+            },
         },
     }
     procedure_payload = {
@@ -244,3 +246,53 @@ def test_vod_callbacks_are_idempotent_and_mark_asset_ready(monkeypatch) -> None:
         assert asset.duration_seconds == 601
         events = list(db.query(WebhookEvent).all())
         assert len(events) == 2
+
+
+def test_vod_callback_marks_asset_failed_when_nested_task_fails(monkeypatch) -> None:
+    import backend.app.modules.media.router as media_router
+
+    monkeypatch.setattr(
+        media_router,
+        "get_settings",
+        lambda: SimpleNamespace(tencent_vod_callback_token="callback-secret"),
+    )
+    session_factory = get_session_factory()
+    with session_factory() as db:
+        asset = VideoAsset(title="失败转码", provider_file_id="vod-file-failed")
+        db.add(asset)
+        db.commit()
+        asset_id = asset.id
+
+    payload = {
+        "EventId": "procedure-event-failed",
+        "EventType": "ProcedureStateChanged",
+        "ProcedureStateChangeEvent": {
+            "FileId": "vod-file-failed",
+            "Status": "FINISH",
+            "MediaProcessResultSet": [
+                {
+                    "Type": "AdaptiveDynamicStreaming",
+                    "AdaptiveDynamicStreamingTask": {
+                        "Status": "FAIL",
+                        "ErrCodeExt": "InvalidInput.ConfigurationUnsupported",
+                        "Message": "empty sub stream results",
+                        "Output": {"Url": ""},
+                    },
+                }
+            ],
+        },
+    }
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/media/vod/callback",
+            json=payload,
+            headers={"X-Avatar-Callback-Token": "callback-secret"},
+        )
+
+    assert response.status_code == 200
+    with session_factory() as db:
+        asset = db.get(VideoAsset, asset_id)
+        assert asset is not None
+        assert asset.status == "failed"
+        assert asset.error_message == "empty sub stream results"

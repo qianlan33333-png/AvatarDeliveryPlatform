@@ -25,7 +25,7 @@
 随后创建任务流，名称必须精确为：
 
 ```text
-avatarDeliveryAdaptiveHLS
+avatarDeliveryHLS
 ```
 
 任务流中只需加入上述自适应码流模板。这个名称对应服务器的 `TENCENT_VOD_PROCEDURE`。
@@ -60,7 +60,7 @@ https://www.qianlan333.cloud/api/v1/media/vod/callback?token=<服务器中的 TE
 TENCENT_VOD_SECRET_ID=<CAM SecretId>
 TENCENT_VOD_SECRET_KEY=<CAM SecretKey>
 TENCENT_VOD_SUB_APP_ID=<VOD 应用 ID>
-TENCENT_VOD_PROCEDURE=avatarDeliveryAdaptiveHLS
+TENCENT_VOD_PROCEDURE=avatarDeliveryHLS
 TENCENT_VOD_STORAGE_REGION=
 ```
 
