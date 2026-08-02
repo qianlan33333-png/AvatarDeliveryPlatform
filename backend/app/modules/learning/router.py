@@ -16,6 +16,7 @@ from backend.app.models import (
     Lesson,
 )
 from backend.app.modules.api.dependencies import CurrentUser, DBSession, OptionalCurrentUser
+from backend.app.modules.capabilities.service import list_capability_states
 from backend.app.modules.entitlements.service import entitlement_is_active
 from backend.app.modules.learning.service import (
     PlaybackAdmissionError,
@@ -306,5 +307,6 @@ def current_profile(db: DBSession, user: CurrentUser):
             }
             for item in active
         ],
+        "capabilities": list_capability_states(db, user.id),
         "active_playback_count": active_playback_count(db, datetime.now(UTC)),
     }

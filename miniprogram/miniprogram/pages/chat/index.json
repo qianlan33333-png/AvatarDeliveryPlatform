@@ -1,4 +1,6 @@
 {
-  "navigationBarTitleText": "聊聊",
-  "usingComponents": {}
+  "navigationBarTitleText": "聊一聊",
+  "usingComponents": {
+    "ai-chat": "/components/ai-chat/index"
+  }
 }

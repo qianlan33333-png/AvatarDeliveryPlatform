@@ -34,6 +34,15 @@ function getErrorMessage(payload: unknown): string {
       return message
     }
   }
+  if (typeof detail === 'object' && detail !== null && 'code' in detail) {
+    const code = (detail as { code?: unknown }).code
+    if (code === 'capability_locked') {
+      return '该能力尚未开通，请联系运营人员'
+    }
+    if (code === 'ai_capacity_full') {
+      return '当前使用人数较多，请稍后再试'
+    }
+  }
   return '请求失败，请稍后重试'
 }
 

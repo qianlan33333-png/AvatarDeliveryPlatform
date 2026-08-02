@@ -3,6 +3,8 @@ from logging.config import fileConfig
 from alembic import context
 
 import backend.app.models  # noqa: F401,E402
+import backend.app.modules.capabilities.models  # noqa: F401,E402
+import backend.app.modules.knowledge.models  # noqa: F401,E402
 from backend.app.config import get_settings
 from backend.app.db import Base
 

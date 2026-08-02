@@ -11,12 +11,16 @@ from backend.app.db import Base, get_engine
 from backend.app.health import router as health_router
 from backend.app.modules.admin.auth import bootstrap_admin
 from backend.app.modules.admin.router import router as admin_router
+from backend.app.modules.capabilities.admin import router as capability_admin_router
+from backend.app.modules.capabilities.router import router as capability_api_router
 from backend.app.modules.catalog.router import router as catalog_router
 from backend.app.modules.chat.admin import router as chat_admin_router
 from backend.app.modules.chat.router import router as chat_router
 from backend.app.modules.entitlements.admin import router as entitlement_admin_router
 from backend.app.modules.entitlements.router import router as entitlement_api_router
 from backend.app.modules.identity.router import router as identity_router
+from backend.app.modules.knowledge.router import admin_router as knowledge_admin_router
+from backend.app.modules.knowledge.router import internal_router as knowledge_internal_router
 from backend.app.modules.learning.router import router as learning_router
 from backend.app.modules.media.router import admin_router as media_admin_router
 from backend.app.modules.media.router import api_router as media_api_router
@@ -50,6 +54,8 @@ def create_app() -> FastAPI:
     application.include_router(health_router)
     application.include_router(admin_router)
     application.include_router(catalog_router)
+    application.include_router(capability_admin_router)
+    application.include_router(capability_api_router)
     application.include_router(chat_admin_router)
     application.include_router(entitlement_admin_router)
     application.include_router(media_admin_router)
@@ -58,6 +64,8 @@ def create_app() -> FastAPI:
     application.include_router(entitlement_api_router)
     application.include_router(learning_router)
     application.include_router(chat_router)
+    application.include_router(knowledge_admin_router)
+    application.include_router(knowledge_internal_router)
 
     @application.exception_handler(HTTPException)
     async def admin_auth_redirect(request: Request, exc: HTTPException):

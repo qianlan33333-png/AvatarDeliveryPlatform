@@ -1,0 +1,63 @@
+<view class="chat-page">
+  <scroll-view class="chat-scroll" scroll-y show-scrollbar="{{false}}" scroll-into-view="{{scrollIntoView}}">
+    <view class="message-list">
+      <view wx:for="{{messages}}" wx:key="id" id="message-{{item.id}}" class="message-row {{item.role}}">
+        <view wx:if="{{item.role == 'assistant'}}" class="assistant-mark">AI</view>
+        <view class="message-content">
+          <view class="message-bubble {{item.role}}">
+            <text wx:if="{{item.content}}" user-select="true">{{item.content}}</text>
+            <view wx:else class="typing-indicator"><text></text><text></text><text></text></view>
+          </view>
+          <view wx:if="{{mode == 'qa' && item.images.length}}" class="answer-images">
+            <view wx:for="{{item.images}}" wx:for-item="answerImage" wx:key="url" class="answer-image-card">
+              <image
+                class="answer-image"
+                src="{{answerImage.url}}"
+                mode="widthFix"
+                data-message-id="{{item.id}}"
+                data-url="{{answerImage.url}}"
+                bindtap="previewAnswerImage"
+              ></image>
+              <text wx:if="{{answerImage.alt_text}}" class="answer-image-alt">{{answerImage.alt_text}}</text>
+            </view>
+          </view>
+          <view wx:if="{{mode == 'qa' && item.cards.length}}" class="recommendation-list">
+            <view wx:for="{{item.cards}}" wx:for-item="card" wx:key="id" class="recommendation-card" data-id="{{card.id}}" bindtap="openRecommendedCourse">
+              <image wx:if="{{card.cover_url}}" class="recommendation-cover" src="{{card.cover_url}}" mode="aspectFill"></image>
+              <view wx:else class="recommendation-cover recommendation-fallback">课</view>
+              <view class="recommendation-copy">
+                <view class="recommendation-head"><text class="recommendation-title">{{card.title}}</text><text class="recommendation-state">{{card.locked ? '可试听' : '已开通'}}</text></view>
+                <text class="recommendation-description">{{card.subtitle || card.description}}</text>
+                <text class="recommendation-action">查看课程 ›</text>
+              </view>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <view wx:if="{{messages.length == 1}}" class="prompt-section">
+        <text class="prompt-label">你可以这样{{mode == 'qa' ? '问' : '说'}}</text>
+        <view class="prompt-list">
+          <view wx:for="{{prompts}}" wx:key="*this" class="prompt-chip" data-prompt="{{item}}" bindtap="choosePrompt">{{item}}</view>
+        </view>
+      </view>
+      <view class="bottom-anchor"></view>
+    </view>
+  </scroll-view>
+
+  <view class="composer safe-area-bottom">
+    <textarea
+      class="composer-input"
+      value="{{draft}}"
+      maxlength="{{maxLength}}"
+      auto-height
+      confirm-type="send"
+      show-confirm-bar="{{false}}"
+      placeholder="{{inputPlaceholder}}"
+      placeholder-class="composer-placeholder"
+      bindinput="onDraftInput"
+      bindconfirm="onSend"
+    />
+    <button class="send-button {{draft && !sending ? 'is-ready' : ''}}" disabled="{{sending}}" loading="{{sending}}" bindtap="onSend">{{sending ? '' : '发送'}}</button>
+  </view>
+</view>

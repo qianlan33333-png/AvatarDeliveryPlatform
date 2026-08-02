@@ -153,6 +153,9 @@ class CourseEntitlement(Base, TimestampMixin):
     effective_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     source_order_id: Mapped[str] = mapped_column(String(160), default="", nullable=False)
+    last_event_effective_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_event_action: Mapped[str] = mapped_column(String(20), default="", nullable=False)
+    last_event_id: Mapped[str] = mapped_column(String(160), default="", nullable=False)
 
     user: Mapped[User | None] = relationship(back_populates="entitlements")
 
@@ -235,6 +238,7 @@ class Conversation(Base, TimestampMixin):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     title: Mapped[str] = mapped_column(String(200), default="新对话", nullable=False)
+    mode: Mapped[str] = mapped_column(String(20), default="qa", nullable=False, index=True)
 
 
 class Message(Base):
@@ -247,6 +251,7 @@ class Message(Base):
     role: Mapped[str] = mapped_column(String(20), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     recommended_course_ids: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    knowledge_unit_ids: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -255,12 +260,31 @@ class LLMConfig(Base, TimestampMixin):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
     name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    provider: Mapped[str] = mapped_column(String(40), default="custom", nullable=False)
+    capability: Mapped[str] = mapped_column(String(20), default="chat", nullable=False, index=True)
     base_url: Mapped[str] = mapped_column(String(500), nullable=False)
     model_name: Mapped[str] = mapped_column(String(200), nullable=False)
     api_key_ciphertext: Mapped[str] = mapped_column(Text, nullable=False)
     system_prompt: Mapped[str] = mapped_column(Text, default="", nullable=False)
     temperature_milli: Mapped[int] = mapped_column(Integer, default=500, nullable=False)
+    embedding_dimension: Mapped[int | None] = mapped_column(Integer)
     is_active: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+
+class AIModelBinding(Base, TimestampMixin):
+    __tablename__ = "ai_model_bindings"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    scene: Mapped[str] = mapped_column(String(40), unique=True, nullable=False)
+    primary_model_id: Mapped[str] = mapped_column(
+        ForeignKey("llm_configs.id", ondelete="CASCADE"), nullable=False
+    )
+    fallback_model_id: Mapped[str | None] = mapped_column(
+        ForeignKey("llm_configs.id", ondelete="SET NULL")
+    )
+    pending_primary_model_id: Mapped[str | None] = mapped_column(
+        ForeignKey("llm_configs.id", ondelete="SET NULL")
+    )
 
 
 class ChatReservation(Base):
@@ -273,8 +297,10 @@ class ChatReservation(Base):
     conversation_id: Mapped[str | None] = mapped_column(
         ForeignKey("conversations.id", ondelete="CASCADE")
     )
+    mode: Mapped[str] = mapped_column(String(20), default="qa", nullable=False, index=True)
     prompt: Mapped[str] = mapped_column(Text, nullable=False)
     candidate_course_ids: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    knowledge_unit_ids: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="reserved", nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

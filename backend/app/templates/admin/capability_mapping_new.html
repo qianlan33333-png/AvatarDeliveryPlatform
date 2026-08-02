@@ -1,0 +1,13 @@
+{% extends "admin/base.html" %}
+{% block title %}新增 AI 商品映射 - 分身交付平台{% endblock %}
+{% block page_title %}新增 AI 商品映射{% endblock %}
+{% block page_action %}<a class="btn btn-secondary" href="/admin/capabilities">返回 AI 会员</a>{% endblock %}
+{% block content %}
+{% if request.query_params.get('error') %}<div class="alert alert-error">保存失败，请检查商品码和能力</div>{% endif %}
+<form class="form-card form-stack narrow-card" method="post" action="/admin/capabilities/mappings/new">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <label class="field"><span>商品码</span><input name="product_code" maxlength="120" required placeholder="例如 AI-COMBO-001"><small class="form-help">同一个商品码可分别绑定课程、聊一聊和话术会员。</small></label>
+  <label class="field"><span>AI 能力</span><select name="capability_code" required><option value="">请选择能力</option>{% for code in capability_codes %}<option value="{{ code }}">{{ capability_labels[code] }}</option>{% endfor %}</select></label>
+  <div class="form-actions"><button class="btn btn-primary" type="submit">保存映射</button></div>
+</form>
+{% endblock %}

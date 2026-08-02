@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Literal
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from backend.app.config import Settings, get_settings
@@ -26,6 +26,7 @@ from backend.app.security import (
 )
 
 EntitlementAction = Literal["grant", "renew", "revoke"]
+_ENTITLEMENT_LOCK_NAMESPACE = "avatar-delivery:entitlement:v1:"
 
 
 class EntitlementApplicationError(ValueError):
@@ -80,6 +81,27 @@ def _utc(value: datetime) -> datetime:
     return value.astimezone(UTC)
 
 
+def entitlement_phone_lock_key(phone_hash: str) -> int:
+    """Return a stable signed bigint suitable for PostgreSQL advisory locks."""
+
+    digest = hashlib.sha256(f"{_ENTITLEMENT_LOCK_NAMESPACE}{phone_hash}".encode()).digest()
+    return int.from_bytes(digest[:8], byteorder="big", signed=True)
+
+
+def lock_entitlements_for_phone_hash(db: Session, phone_hash: str) -> None:
+    """Serialize all entitlement mutations for one normalized phone identity.
+
+    Transaction-scoped advisory locks are intentionally a PostgreSQL-only
+    production guard. SQLite remains a no-op for the local test suite.
+    """
+
+    if db.bind is not None and db.bind.dialect.name == "postgresql":
+        db.execute(
+            text("SELECT pg_advisory_xact_lock(:lock_key)"),
+            {"lock_key": entitlement_phone_lock_key(phone_hash)},
+        )
+
+
 def entitlement_is_active(entitlement: CourseEntitlement, now: datetime | None = None) -> bool:
     current = now or datetime.now(UTC)
     if entitlement.status != "active" or _utc(entitlement.effective_at) > current:
@@ -108,6 +130,21 @@ def _merge_expiry(current: datetime | None, requested: datetime | None) -> datet
     return max(_utc(current), _utc(requested))
 
 
+def entitlement_event_is_stale(
+    entitlement: CourseEntitlement,
+    *,
+    action: EntitlementAction,
+    effective_at: datetime,
+) -> bool:
+    if entitlement.last_event_effective_at is None:
+        return False
+    incoming = _utc(effective_at)
+    current = _utc(entitlement.last_event_effective_at)
+    if incoming < current:
+        return True
+    return incoming == current and entitlement.last_event_action == "revoke" and action != "revoke"
+
+
 def apply_entitlement_command(
     db: Session,
     command: EntitlementCommand,
@@ -120,6 +157,7 @@ def apply_entitlement_command(
     configured = settings or get_settings()
     phone = normalize_phone(command.phone)
     phone_hash = lookup_phone_hash(phone, configured)
+    lock_entitlements_for_phone_hash(db, phone_hash)
     phone_ciphertext = encrypt_phone(phone, configured)
     mappings = list(
         db.scalars(
@@ -172,6 +210,13 @@ def apply_entitlement_command(
         elif owner and entitlement.user_id is None:
             entitlement.user_id = owner.id
 
+        if entitlement_event_is_stale(
+            entitlement,
+            action=command.action,
+            effective_at=command.effective_at,
+        ):
+            continue
+
         if command.action == "revoke":
             entitlement.status = "revoked"
         else:
@@ -185,9 +230,12 @@ def apply_entitlement_command(
                 command.expires_at,
             )
         entitlement.source_order_id = command.order_id
+        entitlement.last_event_effective_at = command.effective_at
+        entitlement.last_event_action = command.action
+        entitlement.last_event_id = command.event_id
         changed += 1
 
-    event.result = "applied"
+    event.result = "applied" if changed else "ignored_stale"
     db.commit()
     return event, changed
 
@@ -233,7 +281,9 @@ def set_manual_course_entitlement(
 ) -> EntitlementEvent:
     if not user.phone_hash or not user.phone_ciphertext:
         raise EntitlementApplicationError("用户尚未绑定手机号")
+    lock_entitlements_for_phone_hash(db, user.phone_hash)
     now = datetime.now(UTC)
+    event_id = f"manual:{uuid.uuid4().hex}"
     entitlement = db.scalar(
         select(CourseEntitlement).where(
             CourseEntitlement.phone_hash == user.phone_hash,
@@ -255,8 +305,10 @@ def set_manual_course_entitlement(
     if action == "grant":
         entitlement.effective_at = now
         entitlement.expires_at = expires_at
+    entitlement.last_event_effective_at = now
+    entitlement.last_event_action = action
+    entitlement.last_event_id = event_id
 
-    event_id = f"manual:{uuid.uuid4().hex}"
     event_payload = {
         "action": action,
         "course_id": course_id,

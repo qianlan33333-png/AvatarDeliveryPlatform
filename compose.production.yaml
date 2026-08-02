@@ -27,8 +27,8 @@ services:
       - "127.0.0.1:18080:8000"
     restart: unless-stopped
     init: true
-    mem_limit: 768m
-    cpus: 1.25
+    mem_limit: 640m
+    cpus: 0.90
     stop_grace_period: 30s
     healthcheck:
       test:
@@ -53,8 +53,8 @@ services:
         condition: service_healthy
     restart: unless-stopped
     init: true
-    mem_limit: 192m
-    cpus: 0.25
+    mem_limit: 128m
+    cpus: 0.15
     stop_grace_period: 20s
     healthcheck:
       test:
@@ -67,16 +67,42 @@ services:
       retries: 5
       start_period: 20s
 
+  knowledge-worker:
+    image: ${APP_IMAGE:?APP_IMAGE is required}
+    container_name: avatar-delivery-knowledge-worker
+    command: ["python", "-m", "backend.app.knowledge_worker"]
+    env_file: ${AVATAR_ENV_FILE:-/srv/avatar-delivery/shared/runtime.env}
+    environment:
+      APP_VERSION: ${APP_RELEASE_SHA:?APP_RELEASE_SHA is required}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    init: true
+    mem_limit: 160m
+    cpus: 0.20
+    stop_grace_period: 20s
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import pathlib,sys,time; p=pathlib.Path('/tmp/avatar-knowledge-worker-heartbeat'); sys.exit(0 if p.exists() and time.time()-p.stat().st_mtime<30 else 1)"
+      interval: 15s
+      timeout: 4s
+      retries: 5
+      start_period: 20s
+
   postgres:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:0.8.2-pg16-bookworm
     container_name: avatar-delivery-postgres
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-avatar_delivery}
       POSTGRES_USER: ${POSTGRES_USER:-avatar}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
     restart: unless-stopped
-    mem_limit: 576m
-    cpus: 0.75
+    mem_limit: 512m
+    cpus: 0.55
     shm_size: 128mb
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
@@ -94,10 +120,10 @@ services:
     command:
       - sh
       - -c
-      - exec redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru --requirepass "$${REDIS_PASSWORD}"
+      - exec redis-server --appendonly yes --maxmemory 96mb --maxmemory-policy allkeys-lru --requirepass "$${REDIS_PASSWORD}"
     restart: unless-stopped
-    mem_limit: 192m
-    cpus: 0.25
+    mem_limit: 160m
+    cpus: 0.15
     healthcheck:
       test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" ping | grep PONG"]
       interval: 5s

@@ -4,10 +4,27 @@ export interface AuthUser {
   phone_last4: string
 }
 
+export type CapabilityCode = 'chat_qa' | 'copywriting'
+
+export type CapabilityStatus =
+  | 'active'
+  | 'upcoming'
+  | 'expired'
+  | 'revoked'
+  | 'not_granted'
+
+export interface CapabilityEntitlement {
+  code: CapabilityCode
+  status: CapabilityStatus
+  effective_at: string | null
+  expires_at: string | null
+}
+
 export interface AuthResponse {
   access_token: string
   token_type: 'bearer'
   claimed_entitlements?: number
+  claimed_capabilities?: number
   user: AuthUser
 }
 
@@ -73,4 +90,5 @@ export interface UserProfile {
     effective_at: string
     expires_at: string | null
   }>
+  capabilities: CapabilityEntitlement[]
 }

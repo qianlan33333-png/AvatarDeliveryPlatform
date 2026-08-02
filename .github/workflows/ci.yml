@@ -22,3 +22,43 @@ jobs:
       - run: python -m pytest
       - run: docker build -t avatar-delivery-platform:${{ github.sha }} .
 
+  deploy-production:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: test
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: avatar-delivery-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Prepare exact-SHA release archive
+        run: git archive --format=tar.gz --output="/tmp/avatar-delivery-${GITHUB_SHA}.tar.gz" HEAD
+      - name: Configure production SSH identity
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.PRODUCTION_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.PRODUCTION_HOST_KEY }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+      - name: Upload release archive
+        env:
+          PRODUCTION_HOST: ${{ secrets.PRODUCTION_HOST }}
+          PRODUCTION_USER: ${{ secrets.PRODUCTION_USER }}
+        run: |
+          scp -o BatchMode=yes "/tmp/avatar-delivery-${GITHUB_SHA}.tar.gz" \
+            "${PRODUCTION_USER}@${PRODUCTION_HOST}:/tmp/avatar-delivery-${GITHUB_SHA}.tar.gz"
+      - name: Deploy and verify exact SHA
+        env:
+          PRODUCTION_HOST: ${{ secrets.PRODUCTION_HOST }}
+          PRODUCTION_USER: ${{ secrets.PRODUCTION_USER }}
+          PRODUCTION_BASE_URL: ${{ secrets.PRODUCTION_BASE_URL }}
+        run: |
+          ssh -o BatchMode=yes "${PRODUCTION_USER}@${PRODUCTION_HOST}" \
+            "sudo install -d -o ${PRODUCTION_USER} -g ${PRODUCTION_USER} /srv/avatar-delivery/releases/${GITHUB_SHA} && tar -xzf /tmp/avatar-delivery-${GITHUB_SHA}.tar.gz -C /srv/avatar-delivery/releases/${GITHUB_SHA} && /srv/avatar-delivery/releases/${GITHUB_SHA}/deploy/release.sh /srv/avatar-delivery/releases/${GITHUB_SHA} ${GITHUB_SHA}"
+          curl --fail --silent --show-error "${PRODUCTION_BASE_URL}/health" \
+            | python -c "import json,sys; data=json.load(sys.stdin); assert data['ok'] and data['version'] == '${GITHUB_SHA}'"

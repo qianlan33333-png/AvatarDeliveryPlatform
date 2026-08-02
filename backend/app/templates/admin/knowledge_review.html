@@ -1,0 +1,58 @@
+{% extends "admin/base.html" %}
+{% block title %}审核清洗结果 - 分身交付平台{% endblock %}
+{% block page_title %}审核清洗结果{% endblock %}
+{% block page_action %}<a class="btn btn-secondary" href="/admin/knowledge/{{ source.id }}">返回语料详情</a>{% endblock %}
+{% block content %}
+{% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+{% if notice %}<div class="alert alert-success">{{ {'imported':'清洗结果已导入','duplicate':'该版本已导入，返回原记录','reviewed':'知识单元已审核','published':'知识版本已原子发布','rejected':'导入已驳回'}.get(notice, '操作成功') }}</div>{% endif %}
+<div class="detail-header">
+  <div><span class="eyebrow">{{ knowledge_import.id }}</span><h2>{{ source.title }} · v{{ knowledge_import.source_version_number }}</h2><small class="subline">处理器 {{ knowledge_import.processor }} / {{ knowledge_import.processor_version }}</small><small class="subline">SHA {{ knowledge_import.source_sha256 }}</small></div>
+  <span class="badge {{ 'badge-success' if knowledge_import.status == 'published' else ('badge-danger' if knowledge_import.status == 'rejected' else 'badge-muted') }}">{{ status_labels.get(knowledge_import.status, knowledge_import.status) }}</span>
+</div>
+<div class="form-card">
+  <div class="section-heading first-section"><h2>原始输入对照</h2></div>
+  <div class="form-grid">
+    <div class="field field-wide"><span>原始语料</span><pre>{{ version.raw_content }}</pre></div>
+    <div class="field"><span>已确认事实</span><pre>{{ version.confirmed_facts or '-' }}</pre></div>
+    <div class="field"><span>待确认信息点</span><pre>{{ version.pending_confirmation_points or '-' }}</pre></div>
+    <div class="field field-wide"><span>禁止项与引用边界</span><pre>{{ version.prohibited_content or '-' }}</pre></div>
+  </div>
+</div>
+<div class="section-heading"><h2>知识单元（{{ knowledge_import.units|length }}）</h2></div>
+<div class="lesson-list">
+{% for unit in knowledge_import.units %}
+  <details class="lesson-card" open>
+    <summary><span class="order-bubble">{{ loop.index }}</span><strong>{{ unit.local_id }} · {{ unit.unit_type }}</strong><span class="lesson-media-state">{{ unit.confirmation }} / {{ status_labels.get(unit.status, unit.status) }}</span></summary>
+    <form class="lesson-form form-grid" method="post" action="/admin/knowledge/imports/{{ knowledge_import.id }}/units/{{ unit.id }}/review">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      {% if unit.unit_type == 'qa' %}
+      <label class="field field-wide"><span>标准问</span><input name="standard_question" maxlength="500" value="{{ unit.standard_question }}" required></label>
+      <label class="field field-wide"><span>标准答案</span><textarea name="standard_answer" rows="7" maxlength="1000" required>{{ unit.standard_answer }}</textarea></label>
+      <label class="field field-wide"><span>答案图片 URL 与替代文字</span><textarea name="images_text" rows="{{ [unit.assets|length + 2, 5]|max }}" placeholder="https://cdn.example.com/answer.jpg | 图片说明">{% for asset in unit.assets %}{{ asset.public_url }}{% if asset.alt_text %} | {{ asset.alt_text }}{% endif %}{{ '\n' if not loop.last else '' }}{% endfor %}</textarea><small class="form-help">每行一张，格式为 HTTPS URL | 纯文本说明；最多 6 张。系统不会抓取或执行图片地址。</small></label>
+      {% else %}
+      <label class="field field-wide"><span>标题</span><input name="title" value="{{ unit.title }}" required></label>
+      <label class="field field-wide"><span>内容</span><textarea name="content" rows="7" maxlength="1000" required>{{ unit.content }}</textarea></label>
+      {% endif %}
+      <label class="field"><span>别名</span><textarea name="aliases_text" rows="3" placeholder="逗号或换行分隔">{{ unit.aliases|join(', ') }}</textarea></label>
+      <label class="field"><span>关键词</span><textarea name="keywords_text" rows="3" placeholder="逗号或换行分隔">{{ unit.keywords|join(', ') }}</textarea></label>
+      <label class="field"><span>适用渠道</span><textarea name="channels_text" rows="3" placeholder="如：朋友圈、社群">{{ unit.channels|join(', ') }}</textarea></label>
+      <label class="field"><span>可见范围</span><select name="visibility" required>{% for value, label in visibility_labels.items() %}<option value="{{ value }}" {{ 'selected' if unit.visibility == value else '' }}>{{ label }}</option>{% endfor %}</select></label>
+      <label class="field field-wide"><span>指定课程 ID</span><input name="course_ids_text" value="{{ unit.course_ids|join(', ') }}" placeholder="仅指定课程可见时填写，逗号分隔"><small class="form-help">不得扩大原始语料权限。可用课程：{% for course in courses %}{{ course.title }}（{{ course.id }}）{{ '；' if not loop.last else '' }}{% else %}暂无课程{% endfor %}</small></label>
+      <label class="field field-wide"><span>来源证据（必须能在输入快照中定位）</span><textarea name="source_evidence" rows="4" required>{{ unit.source_evidence }}</textarea></label>
+      <label class="field"><span>确认状态</span><select name="confirmation"><option value="confirmed" {{ 'selected' if unit.confirmation == 'confirmed' else '' }}>已确认</option><option value="needs_confirmation" {{ 'selected' if unit.confirmation == 'needs_confirmation' else '' }}>待确认</option></select></label>
+      <label class="field"><span>审核备注</span><input name="review_note" value="{{ unit.review_note }}"></label>
+      <div class="form-actions field-wide"><button class="btn btn-danger" name="decision" value="rejected" type="submit">驳回此条</button><button class="btn btn-primary" name="decision" value="approved" type="submit">通过此条</button></div>
+    </form>
+  </details>
+{% endfor %}
+</div>
+{% if knowledge_import.status not in ['published', 'archived'] %}
+<div class="section-heading"><h2>整批处理</h2></div>
+<div class="form-card">
+  <div class="inline-actions">
+    <form method="post" action="/admin/knowledge/imports/{{ knowledge_import.id }}/publish"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn btn-primary" type="submit">原子发布全部已审核知识</button></form>
+    <form class="inline-actions" method="post" action="/admin/knowledge/imports/{{ knowledge_import.id }}/reject"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input name="review_note" placeholder="整批驳回原因"><button class="btn btn-danger" type="submit">整批驳回</button></form>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,45 @@
+{% extends "admin/base.html" %}
+{% block title %}{{ '编辑' if config else '新增' }}模型 - 分身交付平台{% endblock %}
+{% block page_title %}{{ '编辑模型' if config else '新增模型' }}{% endblock %}
+{% block page_action %}<a class="btn btn-secondary" href="/admin/llm-config">返回列表</a>{% endblock %}
+{% block content %}
+{% if error %}<div class="alert alert-error">配置保存失败，请检查输入。</div>{% endif %}
+<form class="form-card form-grid" method="post" action="/admin/llm-config" id="model-form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <input type="hidden" name="config_id" value="{{ config.id if config else '' }}">
+  <label class="field"><span>配置名称 *</span><input name="name" maxlength="100" required value="{{ config.name if config else '' }}" placeholder="例如 DeepSeek 问答"></label>
+  <label class="field"><span>服务商预设 *</span><select name="provider" id="provider-select">
+    {% for code, preset in providers.items() %}<option value="{{ code }}" data-base-url="{{ preset.base_url }}" data-default-model="{{ preset.default_model or '' }}" data-dimension="{{ preset.embedding_dimension or '' }}" {{ 'selected' if (config.provider if config else 'custom') == code else '' }}>{{ preset.label }}</option>{% endfor %}
+  </select></label>
+  <label class="field"><span>能力类型 *</span><select name="capability" id="capability-select"><option value="chat" {{ 'selected' if not config or config.capability == 'chat' else '' }}>聊天生成</option><option value="embedding" {{ 'selected' if config and config.capability == 'embedding' else '' }}>Embedding</option></select></label>
+  <label class="field"><span>模型名 *</span><input id="model-name" name="model_name" maxlength="200" required value="{{ config.model_name if config else '' }}" placeholder="例如 deepseek-v4-flash"></label>
+  <label class="field field-wide"><span>OpenAI-compatible Base URL *</span><input type="url" id="base-url" name="base_url" required value="{{ config.base_url if config else '' }}" placeholder="https://api.example.com/v1"></label>
+  <label class="field"><span>API Key {{ '' if config else '*' }}</span><input type="password" name="api_key" autocomplete="new-password" {{ '' if config else 'required' }} placeholder="服务端加密保存；编辑时可留空"></label>
+  <label class="field" id="dimension-field"><span>向量维度</span><input type="number" id="embedding-dimension" name="embedding_dimension" min="1" max="65535" value="{{ config.embedding_dimension if config and config.embedding_dimension else 1024 }}"></label>
+  <label class="field"><span>Temperature</span><input type="number" name="temperature" min="0" max="2" step="0.1" value="{{ (config.temperature_milli / 1000) if config else 0.5 }}"></label>
+  <label class="field field-wide"><span>系统提示词</span><textarea name="system_prompt" rows="8" placeholder="运行时还会追加事实纪律、权限和输出格式约束。">{{ config.system_prompt if config else '' }}</textarea></label>
+  <label class="checkbox-field field-wide"><input type="checkbox" name="is_active" value="true" {{ 'checked' if config and config.is_active else '' }}><span>启用此配置（场景绑定后才会被调用）</span></label>
+  <div class="form-actions field-wide"><a class="btn btn-secondary" href="/admin/llm-config">取消</a><button class="btn btn-primary" type="submit">保存模型</button></div>
+</form>
+{% endblock %}
+{% block scripts %}
+<script>
+(() => {
+  const provider = document.getElementById('provider-select');
+  const capability = document.getElementById('capability-select');
+  const baseUrl = document.getElementById('base-url');
+  const modelName = document.getElementById('model-name');
+  const dimension = document.getElementById('embedding-dimension');
+  const dimensionField = document.getElementById('dimension-field');
+  const syncCapability = () => { dimensionField.hidden = capability.value !== 'embedding'; };
+  provider.addEventListener('change', () => {
+    const option = provider.options[provider.selectedIndex];
+    if (option.dataset.baseUrl) baseUrl.value = option.dataset.baseUrl;
+    if (option.dataset.defaultModel) modelName.value = option.dataset.defaultModel;
+    if (option.dataset.dimension) dimension.value = option.dataset.dimension;
+  });
+  capability.addEventListener('change', syncCapability);
+  syncCapability();
+})();
+</script>
+{% endblock %}

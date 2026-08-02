@@ -7,6 +7,8 @@ from sqlalchemy.orm import Session
 
 from backend.app.config import Settings, get_settings
 from backend.app.models import CourseEntitlement, User, WeChatIdentity
+from backend.app.modules.capabilities.service import claim_capability_entitlements_for_user
+from backend.app.modules.entitlements.service import lock_entitlements_for_phone_hash
 from backend.app.security import encrypt_phone, lookup_phone_hash, normalize_phone
 
 
@@ -53,10 +55,11 @@ def bind_user_phone(
     user: User,
     raw_phone: str,
     settings: Settings | None = None,
-) -> tuple[User, int]:
+) -> tuple[User, int, int]:
     configured = settings or get_settings()
     phone = normalize_phone(raw_phone)
     phone_hash = lookup_phone_hash(phone, configured)
+    lock_entitlements_for_phone_hash(db, phone_hash)
     owner = db.scalar(select(User).where(User.phone_hash == phone_hash))
     if owner and owner.id != user.id:
         raise PhoneBindingConflict("该手机号已经绑定其他账号，请联系运营处理")
@@ -76,5 +79,6 @@ def bind_user_phone(
     )
     for entitlement in pending:
         entitlement.user_id = user.id
+    claimed_capabilities = claim_capability_entitlements_for_user(db, user, commit=False)
     db.commit()
-    return user, len(pending)
+    return user, len(pending), claimed_capabilities

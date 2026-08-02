@@ -1,14 +1,25 @@
 from __future__ import annotations
 
+import hashlib
+import threading
+from concurrent.futures import ThreadPoolExecutor
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 from backend.app.config import get_settings
-from backend.app.db import get_session_factory
+from backend.app.db import Base, get_session_factory
 from backend.app.main import app
 from backend.app.models import ChatReservation, Course, Lesson, LLMConfig, Message, User
-from backend.app.modules.chat.service import generate_llm_answer
+from backend.app.modules.capabilities.models import CapabilityEntitlement
+from backend.app.modules.chat.service import (
+    ChatTicketError,
+    consume_chat_reservation,
+    generate_llm_answer,
+)
 from backend.app.security import encrypt_value, issue_user_token
 
 
@@ -25,14 +36,22 @@ def _seed_chat_data() -> dict[str, str]:
         )
         db.add_all([user, course])
         db.flush()
-        db.add(
-            Lesson(
-                course_id=course.id,
-                title="付费课节",
-                description="这是绝不能暴露给未购买用户的付费秘密",
-                sort_order=10,
-                status="published",
-            )
+        db.add_all(
+            [
+                Lesson(
+                    course_id=course.id,
+                    title="付费课节",
+                    description="这是绝不能暴露给未购买用户的付费秘密",
+                    sort_order=10,
+                    status="published",
+                ),
+                CapabilityEntitlement(
+                    user_id=user.id,
+                    phone_hash=f"test-{user.id}",
+                    capability_code="chat_qa",
+                    effective_at=datetime.now(UTC),
+                ),
+            ]
         )
         db.commit()
         return {"user_id": user.id, "course_id": course.id}
@@ -188,3 +207,45 @@ def test_deepseek_v4_disables_thinking_for_predictable_json(monkeypatch) -> None
 
     assert chat_service.test_llm_configuration(config) == "OK"
     assert captured["extra_body"] == {"thinking": {"type": "disabled"}}
+
+
+def test_same_chat_ticket_can_only_be_consumed_once_concurrently(tmp_path) -> None:
+    engine = create_engine(
+        f"sqlite+pysqlite:///{tmp_path / 'ticket-race.db'}",
+        connect_args={"check_same_thread": False},
+    )
+    Base.metadata.create_all(engine)
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    ticket = "one-time-ticket"
+    with factory() as db:
+        user = User(nickname="并发票据")
+        db.add(user)
+        db.flush()
+        db.add(
+            ChatReservation(
+                ticket_hash=hashlib.sha256(ticket.encode()).hexdigest(),
+                user_id=user.id,
+                mode="qa",
+                prompt="只能消费一次",
+                expires_at=datetime.now(UTC) + timedelta(minutes=5),
+            )
+        )
+        db.commit()
+        user_id = user.id
+
+    barrier = threading.Barrier(2)
+
+    def consume_once() -> str:
+        with factory() as db:
+            user = db.get(User, user_id)
+            assert user is not None
+            barrier.wait(timeout=5)
+            try:
+                return consume_chat_reservation(db, user=user, ticket=ticket).status
+            except ChatTicketError:
+                return "rejected"
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        outcomes = sorted(executor.map(lambda _: consume_once(), range(2)))
+
+    assert outcomes == ["active", "rejected"]

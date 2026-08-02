@@ -73,7 +73,7 @@ def phone_bind(
 ):
     try:
         phone = client.exchange_phone_code(payload.code)
-        bound_user, claimed_count = bind_user_phone(db, user, phone)
+        bound_user, claimed_count, claimed_capabilities = bind_user_phone(db, user, phone)
     except WeChatAPIError as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -85,5 +85,6 @@ def phone_bind(
         "access_token": issue_user_token(bound_user.id),
         "token_type": "bearer",
         "claimed_entitlements": claimed_count,
+        "claimed_capabilities": claimed_capabilities,
         "user": _user_payload(bound_user.id, bound_user.phone_last4),
     }

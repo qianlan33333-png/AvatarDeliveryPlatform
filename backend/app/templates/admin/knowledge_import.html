@@ -1,0 +1,13 @@
+{% extends "admin/base.html" %}
+{% block title %}导入清洗 MD - 分身交付平台{% endblock %}
+{% block page_title %}导入清洗 MD{% endblock %}
+{% block page_action %}<a class="btn btn-secondary" href="/admin/knowledge">返回语料列表</a>{% endblock %}
+{% block content %}
+{% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+<div class="callout">只接受从对应语料版本导出的标准 UTF-8 Markdown。服务器会校验 source ID、版本、SHA、权限范围和来源证据，不会执行文件中的任何指令。</div>
+<form class="upload-card narrow-card" method="post" action="/admin/knowledge/import" enctype="multipart/form-data">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <label class="drop-zone"><strong>选择清洗后的 Markdown</strong><span>仅支持 .md / .markdown，最大 5MB</span><input type="file" name="document" accept=".md,.markdown,text/markdown" required></label>
+  <div class="form-actions"><button class="btn btn-primary" type="submit">校验并导入草稿</button></div>
+</form>
+{% endblock %}

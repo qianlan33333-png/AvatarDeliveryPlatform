@@ -11,8 +11,15 @@ export interface RecommendedCourseCard {
   locked: boolean
 }
 
+export interface ChatAnswerImage {
+  url: string
+  alt_text: string
+}
+
+export type ChatMode = 'qa' | 'copywriting'
+
 export interface ChatStreamEvent {
-  event: 'ready' | 'delta' | 'recommendations' | 'done' | 'error'
+  event: 'ready' | 'delta' | 'images' | 'recommendations' | 'done' | 'error'
   data: Record<string, unknown>
 }
 
@@ -26,7 +33,7 @@ interface ChunkResult {
   data: ArrayBuffer
 }
 
-interface ChunkedRequestTask {
+export interface ChatStreamTask {
   abort(): void
   onChunkReceived(callback: (result: ChunkResult) => void): void
 }
@@ -138,6 +145,7 @@ class SSEParser {
       if (
         eventName === 'ready' ||
         eventName === 'delta' ||
+        eventName === 'images' ||
         eventName === 'recommendations' ||
         eventName === 'done' ||
         eventName === 'error'
@@ -153,6 +161,7 @@ class SSEParser {
 export async function reserveChat(
   prompt: string,
   conversationId: string,
+  mode: ChatMode = 'qa',
 ): Promise<{ ticket: string; expires_at: string; candidate_count: number }> {
   return request({
     path: '/chat/reservations',
@@ -160,6 +169,7 @@ export async function reserveChat(
     data: {
       prompt,
       conversation_id: conversationId || null,
+      mode,
     },
   })
 }
@@ -167,7 +177,8 @@ export async function reserveChat(
 export function streamChat(
   ticket: string,
   callbacks: ChatStreamCallbacks,
-): ChunkedRequestTask | null {
+  mode: ChatMode = 'qa',
+): ChatStreamTask | null {
   const accessToken = getAccessToken()
   if (!accessToken) {
     callbacks.onError('登录状态已失效，请重新进入')
@@ -178,7 +189,7 @@ export function streamChat(
   let receivedChunk = false
   const chunkedRequest = wx.request as unknown as (
     options: ChunkedRequestOptions,
-  ) => ChunkedRequestTask
+  ) => ChatStreamTask
   const task = chunkedRequest({
     url: `${runtimeConfig.apiBaseUrl}/chat/stream/${encodeURIComponent(ticket)}`,
     method: 'GET',
@@ -187,7 +198,9 @@ export function streamChat(
     timeout: 60000,
     success: (response) => {
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        callbacks.onError('问答请求失败，请稍后重试')
+        callbacks.onError(
+          `${mode === 'copywriting' ? '话术' : '问答'}请求失败，请稍后重试`,
+        )
         return
       }
       if (!receivedChunk && typeof response.data === 'string') {
@@ -197,7 +210,10 @@ export function streamChat(
       }
       callbacks.onComplete()
     },
-    fail: (error) => callbacks.onError(error.errMsg || '问答连接中断'),
+    fail: (error) =>
+      callbacks.onError(
+        error.errMsg || `${mode === 'copywriting' ? '话术' : '问答'}连接中断`,
+      ),
   })
   task.onChunkReceived((result) => {
     receivedChunk = true

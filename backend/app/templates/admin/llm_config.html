@@ -1,37 +1,74 @@
 {% extends "admin/base.html" %}
 {% block title %}模型配置 - 分身交付平台{% endblock %}
 {% block page_title %}模型配置{% endblock %}
+{% block page_action %}<a class="btn btn-primary" href="/admin/llm-config/new">新增模型</a>{% endblock %}
 {% block content %}
-{% if notice %}<div class="alert alert-success">{{ '模型连接正常' if notice == 'test-ok' else '模型配置已保存' }}</div>{% endif %}
-{% if error %}<div class="alert alert-error">{{ '连接测试失败，请检查地址、模型名和 API Key' if error == 'test-failed' else '配置保存失败，请检查必填项' }}</div>{% endif %}
+{% if notice %}
+  <div class="alert alert-success">
+    {% if notice == 'test-ok' %}模型连接正常{% elif notice == 'bindings-saved' %}场景绑定已保存{% elif notice == 'embedding-rebuilding' %}新的向量模型已保存，知识索引正在后台重建；完成前继续使用原模型{% else %}模型配置已保存{% endif %}
+  </div>
+{% endif %}
+{% if error %}
+  <div class="alert alert-error">
+    {% if error == 'test-failed' %}连接测试失败，请检查地址、模型名和 API Key
+    {% elif error == 'invalid-binding' %}场景绑定与模型能力不匹配
+    {% elif error == 'bound-capability' %}已绑定模型不能直接修改能力类型
+    {% elif error == 'inactive-rebuild' %}重建目标模型必须保持启用
+    {% elif error == 'name-conflict' %}配置名称已存在
+    {% else %}配置保存失败，请检查必填项{% endif %}
+  </div>
+{% endif %}
 
-<form class="form-card form-grid" method="post" action="/admin/llm-config">
+<div class="section-heading first-section"><div><span class="eyebrow">SCENE BINDINGS</span><h2>运行场景</h2></div></div>
+<form class="form-card form-grid" method="post" action="/admin/llm-config/bindings">
   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-  <label class="field"><span>配置名称 *</span><input name="name" maxlength="100" required value="默认模型"></label>
-  <label class="field"><span>模型名 *</span><input name="model_name" maxlength="200" required placeholder="例如 gpt-4.1-mini"></label>
-  <label class="field field-wide"><span>OpenAI-compatible Base URL *</span><input type="url" name="base_url" required placeholder="https://api.example.com/v1"></label>
-  <label class="field"><span>API Key *</span><input type="password" name="api_key" autocomplete="new-password" placeholder="仅服务端加密保存；更新时可留空"></label>
-  <label class="field"><span>Temperature</span><input type="number" name="temperature" min="0" max="2" step="0.1" value="0.5"></label>
-  <label class="field field-wide"><span>系统提示词</span><textarea name="system_prompt" rows="6" placeholder="你是一个简洁、可靠的课程助手。"></textarea></label>
-  <label class="checkbox-field field-wide"><input type="checkbox" name="is_active" value="true"><span>保存后立即启用，并停用其他模型配置</span></label>
-  <div class="form-actions field-wide"><button class="btn btn-primary" type="submit">保存模型配置</button></div>
+  {% for scene in scenes %}
+    {% set binding = bindings.get(scene) %}
+    {% set eligible_configs = embedding_configs if scene == 'embedding' else chat_configs %}
+    {% set selected_primary_id = binding.pending_primary_model_id if scene == 'embedding' and binding and binding.pending_primary_model_id else (binding.primary_model_id if binding else '') %}
+    <label class="field">
+      <span>{{ scene_labels[scene] }} · 主模型{% if scene == 'embedding' and binding and binding.pending_primary_model_id %} <span class="badge badge-muted">重建中</span>{% endif %}</span>
+      <select name="{{ scene }}_primary">
+        <option value="">未绑定</option>
+        {% for config in eligible_configs %}
+          <option value="{{ config.id }}" {{ 'selected' if selected_primary_id == config.id else '' }}>{{ config.name }}{{ '' if config.is_active else '（已停用）' }}</option>
+        {% endfor %}
+      </select>
+      {% if scene == 'embedding' and binding and binding.pending_primary_model_id %}<small>当前模型继续服务，全部已发布知识完成新向量后自动切换。</small>{% endif %}
+    </label>
+    <label class="field">
+      <span>{{ scene_labels[scene] }} · 备用模型</span>
+      <select name="{{ scene }}_fallback">
+        <option value="">不设置</option>
+        {% for config in eligible_configs %}
+          <option value="{{ config.id }}" {{ 'selected' if binding and binding.fallback_model_id == config.id else '' }}>{{ config.name }}{{ '' if config.is_active else '（已停用）' }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  {% endfor %}
+  <div class="form-actions field-wide"><button class="btn btn-primary" type="submit">保存场景绑定</button></div>
 </form>
 
-<div class="section-heading"><div><span class="eyebrow">CONFIGURATIONS</span><h2>已有配置</h2></div></div>
+<div class="section-heading"><div><span class="eyebrow">CONFIGURATIONS</span><h2>已有模型</h2></div></div>
 <div class="table-card">
   <table class="data-table">
-    <thead><tr><th>名称</th><th>模型</th><th>Base URL</th><th>状态</th><th>操作</th></tr></thead>
+    <thead><tr><th>名称</th><th>服务商</th><th>能力</th><th>模型</th><th>状态</th><th>操作</th></tr></thead>
     <tbody>
     {% for config in configs %}
       <tr>
-        <td><strong>{{ config.name }}</strong></td>
+        <td><strong>{{ config.name }}</strong><small class="subline">{{ config.base_url }}</small></td>
+        <td>{{ config.provider }}</td>
+        <td><span class="tag">{{ '聊天' if config.capability == 'chat' else '向量 · ' ~ (config.embedding_dimension or 1024) ~ '维' }}</span></td>
         <td>{{ config.model_name }}</td>
-        <td>{{ config.base_url }}</td>
         <td><span class="badge {{ 'badge-success' if config.is_active else 'badge-muted' }}">{{ '已启用' if config.is_active else '已停用' }}</span></td>
-        <td><div class="inline-actions"><form method="post" action="/admin/llm-config/{{ config.id }}/test"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn btn-small btn-secondary" type="submit">连接测试</button></form><form method="post" action="/admin/llm-config/{{ config.id }}/toggle"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn btn-small {{ 'btn-danger' if config.is_active else 'btn-secondary' }}" type="submit">{{ '停用' if config.is_active else '启用' }}</button></form></div></td>
+        <td><div class="inline-actions">
+          <a class="btn btn-small btn-secondary" href="/admin/llm-config/{{ config.id }}/edit">编辑</a>
+          <form method="post" action="/admin/llm-config/{{ config.id }}/test"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn btn-small btn-secondary" type="submit">连接测试</button></form>
+          <form method="post" action="/admin/llm-config/{{ config.id }}/toggle"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn btn-small {{ 'btn-danger' if config.is_active else 'btn-secondary' }}" type="submit">{{ '停用' if config.is_active else '启用' }}</button></form>
+        </div></td>
       </tr>
     {% else %}
-      <tr><td colspan="5"><div class="empty-state">尚未配置模型；未配置时课程推荐会自动使用关键词降级</div></td></tr>
+      <tr><td colspan="6"><div class="empty-state">尚未配置模型。课程浏览不受影响，AI 功能会提示暂时不可用。</div></td></tr>
     {% endfor %}
     </tbody>
   </table>

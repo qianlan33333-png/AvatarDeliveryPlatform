@@ -1,6 +1,8 @@
 {
   "pages": [
+    "pages/home/index",
     "pages/chat/index",
+    "pages/copywriting/index",
     "pages/courses/index",
     "pages/profile/index",
     "pages/courses/detail",
@@ -20,8 +22,8 @@
     "borderStyle": "white",
     "list": [
       {
-        "pagePath": "pages/chat/index",
-        "text": "聊聊"
+        "pagePath": "pages/home/index",
+        "text": "首页"
       },
       {
         "pagePath": "pages/courses/index",

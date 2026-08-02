@@ -21,6 +21,8 @@
 - `ENTITLEMENT_WEBHOOK_SECRET`
 - `APP_SECRET_KEY` / `PHONE_ENCRYPTION_KEY` / `PHONE_LOOKUP_PEPPER`
 - `LLM_ENCRYPTION_KEY`
+- `KNOWLEDGE_INTERNAL_TOKEN`
+- `/srv/avatar-delivery/shared/backup-encryption.key`（独立文件，权限 `600`，不得注入 API/Worker 环境）
 - `ADMIN_BOOTSTRAP_PASSWORD`
 - `FEISHU_ALERT_WEBHOOK`
 
@@ -29,11 +31,15 @@
 ## 3. 服务器发布
 
 1. 在 `/srv/avatar-delivery/releases/<git-sha>` 解压或检出对应版本。
-2. 首次部署运行 `deploy/bootstrap-runtime-env.sh /srv/avatar-delivery/shared/runtime.env <git-sha>` 生成内部密钥；密钥文件权限必须为 `600`。
+2. 首次部署运行 `deploy/bootstrap-runtime-env.sh /srv/avatar-delivery/shared/runtime.env <git-sha>` 生成内部密钥；脚本会分别生成应用环境和独立数据库备份密钥，文件权限均为 `600`。
 3. 构建标记为精确 Git SHA 的镜像。
-4. 运行 `deploy/release.sh <absolute-release-dir> <git-sha>`；脚本会先启动 PostgreSQL/Redis、执行 Alembic，再替换 API/Worker。
+4. 运行 `deploy/release.sh <absolute-release-dir> <git-sha>`；脚本会在切换数据库镜像和执行 Alembic 前生成 AES-256-GCM 加密备份，并在 Docker 内部网络旁路启动不暴露宿主端口的候选 API。候选 SHA 与健康检查都通过后才替换 18080 的现网 API/Worker。
 5. 验证 `/health`、后台登录、微信登录、课程列表、播放准入、webhook 幂等和飞书告警。
-6. 只有新版本健康时才切换 Nginx；保留上一个镜像 SHA 和当前数据库备份。
+6. 只有新版本健康时才切换当前版本指针；保留上一个镜像 SHA 和 `/srv/avatar-delivery/backups` 中的加密数据库备份。恢复演练必须使用副本库，禁止在唯一生产库执行 downgrade。
+
+首次切换到语料版本时还必须确认：数据库镜像为 `pgvector/pgvector:0.8.2-pg16-bookworm`，`vector` 与 `pg_trgm` 扩展已启用，迁移只有一个 head，知识注入开关仍为关闭。导入并审核首批 MD、完成权限与召回测试后再打开 `KNOWLEDGE_INJECTION_ENABLED`。
+
+GitHub `production` Environment 需要配置 `PRODUCTION_HOST`、`PRODUCTION_USER`、`PRODUCTION_SSH_KEY`、`PRODUCTION_HOST_KEY` 和 `PRODUCTION_BASE_URL`。`main` 的 CI 全绿后才会串行发布精确 SHA；发布脚本健康检查失败会恢复上一健康镜像。
 
 当前 2C2G 服务器只是 MVP 宿主。视频流量由 VOD/CDN 承担，但“100 人并发”仍必须通过 125 播放租约 + 15 AI 流 + 后台 + webhook 的混合压测后才能宣称达标。
 
@@ -43,7 +49,7 @@
 
 1. 在开发管理中确认 AppID 和开发者权限。
 2. 将 `https://www.qianlan333.cloud` 加入 `request` 合法域名。
-3. 按实际 VOD/CDN 播放链接，将其 HTTPS 域名加入平台要求的媒体或下载域名白名单。
+3. 按实际 VOD/CDN 播放链接和纯 QA 图片链接，将相应 HTTPS 域名加入平台要求的媒体或下载域名白名单。
 4. 配置服务类目、小程序名称、图标、简介、客服方式、用户隐私保护指引和小程序备案。
 5. 在隐私保护指引中如实声明手机号、学习进度、对话内容和必要设备标识的处理目的。
 

@@ -8,13 +8,19 @@ fi
 
 env_file="$1"
 release_sha="$2"
+shared_dir="$(dirname "$env_file")"
+backup_key_file="$shared_dir/backup-encryption.key"
 if [[ -e "$env_file" ]]; then
   echo "runtime environment already exists; refusing to overwrite" >&2
   exit 1
 fi
+if [[ -e "$backup_key_file" ]] || [[ -L "$backup_key_file" ]]; then
+  echo "backup encryption key already exists; refusing to overwrite" >&2
+  exit 1
+fi
 
 umask 077
-mkdir -p "$(dirname "$env_file")"
+mkdir -p "$shared_dir"
 
 app_secret="$(openssl rand -hex 32)"
 postgres_password="$(openssl rand -hex 24)"
@@ -25,6 +31,8 @@ phone_pepper="$(openssl rand -hex 32)"
 webhook_secret="$(openssl rand -hex 32)"
 callback_token="$(openssl rand -hex 32)"
 llm_key="$(openssl rand -hex 32)"
+knowledge_token="$(openssl rand -hex 32)"
+backup_key="$(openssl rand -hex 32)"
 
 cat > "$env_file" <<EOF
 APP_ENV=production
@@ -64,10 +72,16 @@ PLAYBACK_REDIRECT_TOKEN_MAX_AGE_SECONDS=180
 CHAT_RESERVATION_TTL_SECONDS=60
 LLM_CONCURRENCY_LIMIT=10
 LLM_REQUEST_TIMEOUT_SECONDS=30
+KNOWLEDGE_INTERNAL_TOKEN=$knowledge_token
+KNOWLEDGE_INJECTION_ENABLED=false
+KNOWLEDGE_CONTEXT_MAX_CHARS=6000
+KNOWLEDGE_EMBEDDING_BATCH_SIZE=32
 FEISHU_ALERT_WEBHOOK=
 EOF
 
 chmod 600 "$env_file"
-printf '%s\n' "$admin_password" > "$(dirname "$env_file")/bootstrap-admin-password.txt"
-chmod 600 "$(dirname "$env_file")/bootstrap-admin-password.txt"
+printf '%s\n' "$backup_key" > "$backup_key_file"
+chmod 600 "$backup_key_file"
+printf '%s\n' "$admin_password" > "$shared_dir/bootstrap-admin-password.txt"
+chmod 600 "$shared_dir/bootstrap-admin-password.txt"
 echo "runtime environment created; external integration credentials remain disabled"

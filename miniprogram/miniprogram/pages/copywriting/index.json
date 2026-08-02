@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "帮我写话术",
+  "usingComponents": {
+    "ai-chat": "/components/ai-chat/index"
+  }
+}

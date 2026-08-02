@@ -46,13 +46,49 @@ class Settings(BaseSettings):
     chat_reservation_ttl_seconds: int = 60
     llm_concurrency_limit: int = 10
     llm_request_timeout_seconds: int = 30
+    knowledge_internal_token: str = ""
+    knowledge_injection_enabled: bool = False
+    knowledge_context_max_chars: int = 6000
+    knowledge_embedding_batch_size: int = 32
+    knowledge_index_max_attempts: int = 5
+    knowledge_index_retry_base_seconds: int = 15
+    knowledge_index_running_timeout_seconds: int = 300
     feishu_alert_webhook: str = ""
 
     @property
     def is_production(self) -> bool:
         return self.app_env.lower() == "production"
 
+    def validate_runtime_security(self) -> None:
+        """Fail closed when production would reuse public or weak key material."""
+
+        if not self.is_production:
+            return
+        required_secrets = {
+            "APP_SECRET_KEY": self.app_secret_key,
+            "PHONE_ENCRYPTION_KEY": self.phone_encryption_key,
+            "PHONE_LOOKUP_PEPPER": self.phone_lookup_pepper,
+            "LLM_ENCRYPTION_KEY": self.llm_encryption_key,
+        }
+        known_defaults = {
+            "development-only-secret-change-me",
+            "development-phone-pepper",
+        }
+        invalid = sorted(
+            name
+            for name, value in required_secrets.items()
+            if len(value.strip()) < 32
+            or value.strip() in known_defaults
+            or value.strip().lower().startswith("replace-")
+        )
+        if invalid:
+            raise RuntimeError(
+                "insecure production secret configuration: " + ", ".join(invalid)
+            )
+
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()
+    settings = Settings()
+    settings.validate_runtime_security()
+    return settings

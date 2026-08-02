@@ -13,10 +13,10 @@ from backend.app.alerts import send_feishu_alert
 from backend.app.config import get_settings
 from backend.app.models import EntitlementEvent, WebhookNonce
 from backend.app.modules.api.dependencies import DBSession
+from backend.app.modules.capabilities.service import apply_benefit_entitlement_command
 from backend.app.modules.entitlements.service import (
     EntitlementApplicationError,
     EntitlementCommand,
-    apply_entitlement_command,
     canonical_command_hash,
     webhook_signature_matches,
 )
@@ -128,7 +128,7 @@ async def course_entitlement_webhook(
         )
     )
     try:
-        event, changed = apply_entitlement_command(
+        result = apply_benefit_entitlement_command(
             db,
             command,
             payload_hash=payload_hash,
@@ -137,10 +137,22 @@ async def course_entitlement_webhook(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except IntegrityError as exc:
         db.rollback()
+        raced = db.scalar(
+            select(EntitlementEvent).where(EntitlementEvent.event_id == command.event_id)
+        )
+        if raced and raced.payload_hash == payload_hash:
+            return {"ok": True, "status": "duplicate", "event_id": command.event_id}
+        if raced:
+            send_feishu_alert(
+                "课程权益事件冲突",
+                f"event_id={command.event_id} 并发收到相同 ID 不同内容",
+            )
+            raise HTTPException(status_code=409, detail="event id payload conflict") from exc
         raise HTTPException(status_code=409, detail="webhook event conflict") from exc
     return {
         "ok": True,
-        "status": event.result,
-        "event_id": event.event_id,
-        "entitlements_changed": changed,
+        "status": result.event.result,
+        "event_id": result.event.event_id,
+        "entitlements_changed": result.course_entitlements_changed,
+        "capability_entitlements_changed": result.capability_entitlements_changed,
     }

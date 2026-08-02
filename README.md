@@ -4,9 +4,11 @@
 
 - 微信身份和手机号权益绑定；
 - 课程、课节及腾讯云 VOD 视频素材管理；
-- 外部 webhook 幂等开通课程；
+- 外部 webhook 幂等开通课程和独立 AI 会员；
 - 微信原生小程序看课；
-- 基础问答和关键词课程推荐。
+- 独立的“聊一聊”和“帮我写话术”；
+- 分身语料版本、Markdown 清洗交接、人工审核发布和 pgvector 混合检索；
+- 纯 QA 库严格按已发布标准答案回复，并可随答案返回审核过的图片。
 
 本仓库与 AI-CRM、HuangYouCanAI 的代码、数据库、队列和部署完全隔离。
 
@@ -35,7 +37,7 @@ ruff check backend tests
 
 1. 将 `www.qianlan333.cloud` 解析到业务服务器，完成 HTTPS；
 2. 在服务器安全配置微信、VOD、模型、webhook 和飞书密钥；
-3. 部署精确代码版本，执行数据库迁移并通过健康检查；
+3. 部署精确代码版本，先完成加密备份，再执行数据库迁移并通过旁路健康检查；
 4. 在微信公众平台配置服务器合法域名和隐私合规信息；
 5. 使用微信开发者工具上传体验版，通过真机验收后提交审核；
 6. 审核通过后由小程序管理员点击发布。
@@ -51,7 +53,13 @@ ruff check backend tests
 
 ## 权益 webhook
 
-外部订单系统的签名方式、载荷和幂等规则见 [课程权益 webhook 契约](docs/integrations/course-entitlement-webhook.md)。
+外部订单系统的签名方式、载荷和幂等规则见 [课程权益 webhook 契约](docs/integrations/course-entitlement-webhook.md)。新接入方使用 `/api/v1/webhooks/benefit-entitlements`，旧课程地址继续兼容；同一商品码可以同时映射课程、`chat_qa` 和 `copywriting`。
+
+## 分身语料
+
+后台“分身语料”只做人工录入、版本、MD 导入导出、审核和发布，不在页面内调用清洗 Agent。唯一交换格式及内部接口见 [AI 分身语料清洗标准](docs/knowledge/AI分身语料清洗标准.md)。生产首次部署保持 `KNOWLEDGE_INJECTION_ENABLED=false`，首批语料审核和召回验收后再打开。
+
+`pure_qa` 类型命中时不调用聊天模型，直接输出人工审核发布的标准答案；图片只保存公网 HTTPS/CDN 引用并继承知识权限。图片域名还必须加入微信小程序相应的合法域名白名单。
 
 ## 腾讯云 VOD 接入
 

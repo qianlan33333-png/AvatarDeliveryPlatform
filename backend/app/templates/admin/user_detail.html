@@ -1,7 +1,7 @@
 {% extends "admin/base.html" %}
 {% block title %}用户课程权益 - 分身交付平台{% endblock %}
 {% block page_title %}用户课程权益{% endblock %}
-{% block page_action %}<a class="btn btn-secondary" href="/admin/users">返回用户列表</a>{% endblock %}
+{% block page_action %}<div class="inline-actions"><a class="btn btn-primary" href="/admin/capabilities/users/{{ user.id }}">管理 AI 权益</a><a class="btn btn-secondary" href="/admin/users">返回用户列表</a></div>{% endblock %}
 {% block content %}
 {% if notice %}<div class="alert alert-success">课程权益已更新</div>{% endif %}
 {% if error %}<div class="alert alert-error">操作失败：请确认用户已绑定手机号且参数有效</div>{% endif %}

@@ -1,0 +1,9 @@
+<ai-chat
+  mode="copywriting"
+  welcome-message="告诉我沟通对象、使用渠道和目标，我会帮你写成更自然、可以直接使用的话术。"
+  input-placeholder="描述对象、渠道和你想达到的目标"
+  empty-prompt="先说说你想写什么话术"
+  error-fallback="话术生成暂时不可用"
+  prompts="{{prompts}}"
+  max-length="1000"
+/>

@@ -20,8 +20,17 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  knowledge-worker:
+    build: .
+    command: ["python", "-m", "backend.app.knowledge_worker"]
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
   postgres:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:0.8.2-pg16-bookworm
     environment:
       POSTGRES_DB: avatar_delivery
       POSTGRES_USER: avatar

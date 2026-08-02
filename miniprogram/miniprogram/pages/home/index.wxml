@@ -1,0 +1,29 @@
+<view class="screen home-page">
+  <view wx:if="{{error}}" class="status-banner">
+    <text>{{error}}</text>
+    <text class="status-retry" bindtap="loadCapabilities">重新加载</text>
+  </view>
+
+  <text class="home-guidance">选择你现在需要的帮助</text>
+
+  <view class="entry-list">
+    <view
+      wx:for="{{entries}}"
+      wx:key="code"
+      class="entry-card {{item.tone}} {{item.active ? 'unlocked' : 'locked'}}"
+      data-code="{{item.code}}"
+      bindtap="openCapability"
+    >
+      <view class="entry-head">
+        <view class="entry-mark">{{item.mark}}</view>
+        <text class="entry-state {{item.active ? 'active' : ''}}">{{loading ? '确认中' : item.statusLabel}}</text>
+      </view>
+      <text class="entry-title">{{item.title}}</text>
+      <text class="entry-description">{{item.description}}</text>
+      <view class="entry-footer">
+        <text class="entry-period">{{loading ? '正在获取会员状态…' : item.periodLabel}}</text>
+        <text class="entry-action">{{loading ? '请稍候' : item.actionLabel}} ›</text>
+      </view>
+    </view>
+  </view>
+</view>

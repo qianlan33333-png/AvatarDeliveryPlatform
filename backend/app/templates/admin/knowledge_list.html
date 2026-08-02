@@ -1,0 +1,32 @@
+{% extends "admin/base.html" %}
+{% block title %}分身语料 - 分身交付平台{% endblock %}
+{% block page_title %}分身语料{% endblock %}
+{% block page_action %}<div class="inline-actions"><a class="btn btn-secondary" href="/admin/knowledge/import">导入清洗 MD</a><a class="btn btn-primary" href="/admin/knowledge/new">新增语料</a></div>{% endblock %}
+{% block content %}
+<form class="toolbar" method="get" action="/admin/knowledge">
+  <input class="search-input" name="q" value="{{ q }}" placeholder="搜索语料标题">
+  <select name="source_type"><option value="">全部来源</option>{% for value, label in source_types.items() %}<option value="{{ value }}" {{ 'selected' if source_type == value else '' }}>{{ label }}</option>{% endfor %}</select>
+  <select name="lifecycle"><option value="">全部状态</option>{% for value, label in status_labels.items() %}<option value="{{ value }}" {{ 'selected' if lifecycle == value else '' }}>{{ label }}</option>{% endfor %}</select>
+  <button class="btn btn-secondary" type="submit">筛选</button>
+</form>
+<div class="table-card">
+  <table class="data-table">
+    <thead><tr><th>语料</th><th>来源</th><th>可见范围</th><th>当前版本</th><th>处理状态</th><th>发布状态</th><th>操作</th></tr></thead>
+    <tbody>
+    {% for source in sources %}
+      <tr>
+        <td><strong>{{ source.title }}</strong><small class="subline">{{ source.id }}</small></td>
+        <td>{{ source_types.get(source.source_type, source.source_type) }}</td>
+        <td>{{ visibility_labels.get(source.visibility, source.visibility) }}</td>
+        <td>v{{ source.current_version_number }}{% if source.published_version_number %}<small class="subline">已发布 v{{ source.published_version_number }}</small>{% endif %}</td>
+        <td><span class="badge {{ 'badge-success' if source.processing_status == 'imported' else 'badge-muted' }}">{{ {'not_ready':'未提交清洗','ready_for_agent':'待 Agent 清洗','imported':'已导入'}.get(source.processing_status, source.processing_status) }}</span></td>
+        <td><span class="badge {{ 'badge-success' if source.status == 'published' else ('badge-danger' if source.status == 'rejected' else 'badge-muted') }}">{{ status_labels.get(source.status, source.status) }}</span></td>
+        <td><a class="btn btn-small btn-secondary" href="/admin/knowledge/{{ source.id }}">查看</a></td>
+      </tr>
+    {% else %}
+      <tr><td colspan="7"><div class="empty-state">还没有语料，先录入第一份原始材料。</div></td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

@@ -8,9 +8,9 @@ from sqlalchemy.exc import IntegrityError
 from backend.app.models import Course, EntitlementEvent, ProductCourseMapping
 from backend.app.modules.admin.auth import require_csrf
 from backend.app.modules.admin.dependencies import CurrentAdmin, DBSession, admin_context
+from backend.app.modules.capabilities.service import replay_benefit_entitlement_event
 from backend.app.modules.entitlements.service import (
     EntitlementApplicationError,
-    replay_entitlement_event,
 )
 from backend.app.security import SecurityValueError, decrypt_phone
 from backend.app.web import templates
@@ -131,7 +131,7 @@ def replay_event(
     if not event:
         raise HTTPException(status_code=404, detail="event not found")
     try:
-        replay_entitlement_event(db, event)
+        replay_benefit_entitlement_event(db, event)
     except EntitlementApplicationError:
         return RedirectResponse("/admin/entitlements?error=replay-failed", status_code=303)
     return RedirectResponse("/admin/entitlements?notice=replayed", status_code=303)
