@@ -27,7 +27,7 @@ if [[ -L "$base_dir/current" ]]; then
 fi
 
 compose() {
-  sudo env APP_IMAGE="$image" AVATAR_ENV_FILE="$env_file" \
+  sudo env APP_IMAGE="$image" APP_RELEASE_SHA="$release_sha" AVATAR_ENV_FILE="$env_file" \
     docker compose --project-name avatar-delivery \
     --env-file "$env_file" -f "$compose_file" "$@"
 }
@@ -37,7 +37,7 @@ rollback_previous() {
     return
   fi
   previous_sha="$(basename "$previous_dir")"
-  sudo env APP_IMAGE="avatar-delivery-platform:$previous_sha" AVATAR_ENV_FILE="$env_file" \
+  sudo env APP_IMAGE="avatar-delivery-platform:$previous_sha" APP_RELEASE_SHA="$previous_sha" AVATAR_ENV_FILE="$env_file" \
     docker compose --project-name avatar-delivery \
     --env-file "$env_file" -f "$previous_dir/compose.production.yaml" \
     up -d postgres redis api worker

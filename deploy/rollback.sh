@@ -20,7 +20,7 @@ if [[ ! -f "$compose_file" ]] || ! sudo docker image inspect "$image" >/dev/null
   exit 2
 fi
 
-sudo env APP_IMAGE="$image" AVATAR_ENV_FILE="$env_file" \
+sudo env APP_IMAGE="$image" APP_RELEASE_SHA="$target_sha" AVATAR_ENV_FILE="$env_file" \
   docker compose --project-name avatar-delivery \
   --env-file "$env_file" -f "$compose_file" up -d postgres redis api worker
 
