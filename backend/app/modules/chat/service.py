@@ -8,6 +8,7 @@ import threading
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
+from urllib.parse import urlparse
 
 from openai import OpenAI
 from sqlalchemy import func, select, text
@@ -35,6 +36,14 @@ class LLMAnswer:
     answer: str
     course_ids: list[str]
     degraded: bool = False
+
+
+def _completion_overrides(llm_config: LLMConfig) -> dict[str, Any]:
+    """Return provider-specific options required for predictable V1 chat output."""
+    hostname = (urlparse(llm_config.base_url).hostname or "").lower()
+    if hostname == "api.deepseek.com" and llm_config.model_name.startswith("deepseek-v4-"):
+        return {"extra_body": {"thinking": {"type": "disabled"}}}
+    return {}
 
 
 def _utc(value: datetime) -> datetime:
@@ -258,6 +267,7 @@ def generate_llm_answer(
             model=llm_config.model_name,
             messages=messages,  # type: ignore[arg-type]
             temperature=llm_config.temperature_milli / 1000,
+            **_completion_overrides(llm_config),
         )
         content = completion.choices[0].message.content or ""
         parsed = _parse_json_answer(content)
@@ -305,5 +315,6 @@ def test_llm_configuration(
         messages=[{"role": "user", "content": "只回复 OK"}],
         temperature=0,
         max_tokens=8,
+        **_completion_overrides(llm_config),
     )
     return (completion.choices[0].message.content or "").strip()

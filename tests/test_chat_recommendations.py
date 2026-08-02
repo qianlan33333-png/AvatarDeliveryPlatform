@@ -156,3 +156,35 @@ def test_model_can_only_return_candidate_ids_and_never_sees_paid_lesson(monkeypa
     serialized_messages = str(captured["messages"])
     assert "公开课程简介" in serialized_messages
     assert "绝不能暴露" not in serialized_messages
+    assert "extra_body" not in captured
+
+
+def test_deepseek_v4_disables_thinking_for_predictable_json(monkeypatch) -> None:
+    import backend.app.modules.chat.service as chat_service
+
+    captured: dict[str, object] = {}
+
+    class FakeCompletions:
+        def create(self, **kwargs):
+            captured.update(kwargs)
+            return SimpleNamespace(
+                choices=[SimpleNamespace(message=SimpleNamespace(content="OK"))]
+            )
+
+    fake_client = SimpleNamespace(chat=SimpleNamespace(completions=FakeCompletions()))
+    monkeypatch.setattr(chat_service, "OpenAI", lambda **_: fake_client)
+    settings = get_settings()
+    config = LLMConfig(
+        name="DeepSeek V4 Flash",
+        base_url="https://api.deepseek.com",
+        model_name="deepseek-v4-flash",
+        api_key_ciphertext=encrypt_value(
+            "test-api-key",
+            purpose="llm-api-key",
+            key_material=settings.llm_encryption_key,
+            settings=settings,
+        ),
+    )
+
+    assert chat_service.test_llm_configuration(config) == "OK"
+    assert captured["extra_body"] == {"thinking": {"type": "disabled"}}
