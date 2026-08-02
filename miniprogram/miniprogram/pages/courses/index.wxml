@@ -22,6 +22,7 @@
       aria-role="button"
       aria-label="查看课程 {{item.title}}"
     >
+      <text class="enrollment-badge {{item.has_access ? 'enrolled' : 'not-enrolled'}}">{{item.has_access ? '已报名' : '未报名'}}</text>
       <view class="course-cover">
         <image wx:if="{{item.cover_url}}" class="course-cover-image" src="{{item.cover_url}}" mode="aspectFill" lazy-load></image>
         <image wx:else class="course-cover-image" src="/assets/course-cover-fallback.png" mode="aspectFill"></image>

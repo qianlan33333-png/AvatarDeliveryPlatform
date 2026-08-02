@@ -59,49 +59,6 @@
   margin-top: 16rpx;
 }
 
-.locked-course-card {
-  margin-top: 22rpx;
-  padding: 28rpx;
-}
-
-.locked-course-title,
-.locked-course-description {
-  display: block;
-}
-
-.locked-course-title {
-  color: #35332f;
-  font-size: 27rpx;
-  font-weight: 700;
-}
-
-.locked-course-description {
-  margin-top: 10rpx;
-  display: -webkit-box;
-  overflow: hidden;
-  color: #7c786f;
-  font-size: 24rpx;
-  line-height: 1.6;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-
-.contact-button {
-  height: 76rpx;
-  margin-top: 22rpx;
-  border: 0;
-  border-radius: 38rpx;
-  background: #f5d060;
-  color: #2d2d2d;
-  font-size: 25rpx;
-  font-weight: 750;
-  line-height: 76rpx;
-}
-
-.contact-button::after {
-  border: 0;
-}
-
 .lesson-panel {
   margin-top: 24rpx;
   padding: 0 28rpx;

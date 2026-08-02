@@ -20,18 +20,6 @@
       ></progress>
     </view>
 
-    <view wx:if="{{!course.has_access}}" class="locked-course-card surface-card">
-      <view class="locked-course-copy">
-        <text class="locked-course-title">{{course.preview_lesson_count > 0 ? '可查看介绍和试听课节' : '可查看课程介绍'}}</text>
-        <text class="locked-course-description">{{course.description}}</text>
-      </view>
-      <button
-        class="contact-button"
-        open-type="contact"
-        session-from="course:{{course.id}}"
-      >联系运营开通完整课程</button>
-    </view>
-
     <view class="lesson-panel surface-card">
       <view class="lesson-toolbar">
         <text class="lesson-heading-title">课节列表 · {{course.lesson_count}}</text>

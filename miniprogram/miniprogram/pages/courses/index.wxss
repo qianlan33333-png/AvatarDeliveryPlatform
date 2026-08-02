@@ -45,6 +45,7 @@
 }
 
 .course-card {
+  position: relative;
   min-height: 232rpx;
   padding: 20rpx;
   display: flex;
@@ -86,11 +87,34 @@
 }
 
 .course-title {
+  padding-right: 104rpx;
   color: #282725;
   font-size: 32rpx;
   font-weight: 750;
   line-height: 1.35;
   -webkit-line-clamp: 2;
+}
+
+.enrollment-badge {
+  position: absolute;
+  z-index: 1;
+  top: 20rpx;
+  right: 20rpx;
+  padding: 6rpx 13rpx;
+  border-radius: 12rpx;
+  font-size: 20rpx;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.enrollment-badge.enrolled {
+  background: #fff2bd;
+  color: #806000;
+}
+
+.enrollment-badge.not-enrolled {
+  background: #f1f1ef;
+  color: #74746f;
 }
 
 .course-learning {
