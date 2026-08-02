@@ -36,6 +36,8 @@ def publish_issues(course: Course) -> list[str]:
         issues.append("课程简介不能为空")
     if not course.lessons:
         issues.append("至少创建一个课节")
+    elif not any(lesson.is_preview for lesson in course.lessons):
+        issues.append("至少设置一个独立试听课节")
     for lesson in course.lessons:
         if lesson.video_asset is None:
             issues.append(f"课节“{lesson.title}”尚未绑定视频")

@@ -260,5 +260,19 @@ Component({
         })
       }
     },
+
+    applyCopyAction(event: WechatMiniprogram.TapEvent) {
+      const action = event.currentTarget.dataset.action
+      const content = event.currentTarget.dataset.content
+      if (typeof content !== 'string' || !content) return
+      if (action === 'copy') {
+        wx.setClipboardData({ data: content })
+        return
+      }
+      const prefix = action === 'shorter'
+        ? '请把上一版再缩短一些，保留核心信息：'
+        : '请把上一版换成更口语、更自然的开头：'
+      this.setData({ draft: `${prefix}${content}` })
+    },
   },
 })

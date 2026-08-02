@@ -1,10 +1,12 @@
 {% extends "admin/base.html" %}
 {% block title %}用户管理 - 分身交付平台{% endblock %}
+{% block page_kicker %}<span class="page-kicker">USERS</span>{% endblock %}
 {% block page_title %}用户管理{% endblock %}
+{% block page_action %}<div class="header-metric">共 <strong>{{ users_total }}</strong> 位注册用户 · 今日新增 {{ users_today }}</div>{% endblock %}
 {% block content %}
 <form class="toolbar" method="get" action="/admin/users">
   <input class="search-input" name="keyword" value="{{ keyword }}" placeholder="搜索昵称、用户ID或手机号后四位">
-  <button class="btn btn-secondary" type="submit">搜索</button>
+  <button class="btn btn-primary" type="submit">搜索</button>
   {% if keyword %}<a class="btn btn-ghost" href="/admin/users">清除</a>{% endif %}
 </form>
 <div class="table-card">
@@ -19,24 +21,18 @@
         <td>{{ user.last_login_at.strftime('%Y-%m-%d %H:%M') if user.last_login_at else '-' }}</td>
         <td><span class="badge {{ 'badge-success' if user.is_active else 'badge-muted' }}">{{ '正常' if user.is_active else '已禁用' }}</span></td>
         <td>
-          <div class="inline-actions">
-          <a class="btn btn-small btn-secondary" href="/admin/users/{{ user.id }}">课程权益</a>
-          <form method="post" action="/admin/users/{{ user.id }}/toggle">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-            <button class="btn btn-small {{ 'btn-danger' if user.is_active else 'btn-secondary' }}" type="submit">{{ '禁用' if user.is_active else '启用' }}</button>
-          </form>
-          </div>
+          <a class="btn btn-small btn-secondary" href="/admin/users/{{ user.id }}">用户明细</a>
         </td>
       </tr>
     {% else %}
-      <tr><td colspan="6"><div class="empty-state">暂无用户</div></td></tr>
+      <tr><td colspan="6"><div class="empty-state"><span class="empty-symbol">用</span><strong class="state-title">暂无用户</strong><span class="state-copy">用户完成微信登录后会显示在这里。</span></div></td></tr>
     {% endfor %}
     </tbody>
   </table>
 </div>
-<nav class="pagination" aria-label="分页">
-  {% if page > 1 %}<a class="btn btn-ghost" href="?page={{ page - 1 }}&keyword={{ encoded_keyword }}">上一页</a>{% endif %}
-  <span>第 {{ page }} 页</span>
-  {% if has_next %}<a class="btn btn-ghost" href="?page={{ page + 1 }}&keyword={{ encoded_keyword }}">下一页</a>{% endif %}
-</nav>
+<div class="pagination-bar"><span>共 {{ total }} 位用户</span><nav class="pagination" aria-label="分页">
+  <a class="page-link {{ 'disabled' if page <= 1 else '' }}" href="?page={{ page - 1 }}&keyword={{ encoded_keyword }}">←</a>
+  {% for number in range(1, total_pages + 1) %}{% if number == 1 or number == total_pages or (number >= page - 1 and number <= page + 1) %}<a class="page-link {{ 'active' if number == page else '' }}" href="?page={{ number }}&keyword={{ encoded_keyword }}">{{ number }}</a>{% elif number == 2 and page > 3 or number == total_pages - 1 and page < total_pages - 2 %}<span>…</span>{% endif %}{% endfor %}
+  <a class="page-link {{ 'disabled' if page >= total_pages else '' }}" href="?page={{ page + 1 }}&keyword={{ encoded_keyword }}">→</a>
+</nav><span class="pagination-size">每页 {{ page_size }} 条</span></div>
 {% endblock %}

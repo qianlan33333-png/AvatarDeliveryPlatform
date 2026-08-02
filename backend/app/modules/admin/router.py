@@ -3,7 +3,7 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 
 from backend.app.models import Course, CourseEntitlement, User
 from backend.app.modules.admin.auth import (
@@ -13,6 +13,12 @@ from backend.app.modules.admin.auth import (
     require_csrf,
 )
 from backend.app.modules.admin.dependencies import CurrentAdmin, DBSession, admin_context
+from backend.app.modules.capabilities.models import CapabilityEntitlement
+from backend.app.modules.capabilities.service import (
+    CAPABILITY_CODES,
+    CAPABILITY_LABELS,
+    capability_entitlement_status,
+)
 from backend.app.modules.entitlements.service import (
     EntitlementApplicationError,
     set_manual_course_entitlement,
@@ -76,8 +82,9 @@ def users_page(
     page: int = 1,
 ):
     page = max(page, 1)
-    page_size = 30
+    page_size = 20
     statement = select(User)
+    count_statement = select(func.count(User.id))
     normalized = keyword.strip()
     if normalized:
         like = f"%{normalized}%"
@@ -88,15 +95,27 @@ def users_page(
                 User.phone_last4.ilike(like[-4:]),
             )
         )
+        count_statement = count_statement.where(
+            or_(
+                User.nickname.ilike(like),
+                User.id.ilike(like),
+                User.phone_last4.ilike(like[-4:]),
+            )
+        )
+    total = int(db.scalar(count_statement) or 0)
     users = list(
         db.scalars(
             statement.order_by(User.created_at.desc())
             .offset((page - 1) * page_size)
-            .limit(page_size + 1)
+            .limit(page_size)
         )
     )
-    has_next = len(users) > page_size
-    users = users[:page_size]
+    users_total = int(db.scalar(select(func.count(User.id))) or 0)
+    today_start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+    users_today = int(
+        db.scalar(select(func.count(User.id)).where(User.created_at >= today_start)) or 0
+    )
+    total_pages = max(1, (total + page_size - 1) // page_size)
     return templates.TemplateResponse(
         request=request,
         name="admin/users.html",
@@ -106,7 +125,11 @@ def users_page(
             users=users,
             keyword=normalized,
             page=page,
-            has_next=has_next,
+            total=total,
+            total_pages=total_pages,
+            page_size=page_size,
+            users_total=users_total,
+            users_today=users_today,
             encoded_keyword=quote(normalized),
         ),
     )
@@ -136,6 +159,7 @@ def user_detail_page(
     admin: CurrentAdmin,
     notice: str = "",
     error: str = "",
+    tab: str = "course",
 ):
     user = db.get(User, user_id)
     if not user:
@@ -148,9 +172,20 @@ def user_detail_page(
             .order_by(Course.sort_order, Course.created_at)
         ).all()
     )
-    courses = list(
-        db.scalars(select(Course).where(Course.status != "archived").order_by(Course.sort_order))
-    )
+    capability_by_code = {
+        item.capability_code: item
+        for item in db.scalars(
+            select(CapabilityEntitlement).where(CapabilityEntitlement.user_id == user.id)
+        )
+    }
+    capability_rows = [
+        {
+            "code": code,
+            "entitlement": capability_by_code.get(code),
+            "display_status": capability_entitlement_status(capability_by_code.get(code)),
+        }
+        for code in CAPABILITY_CODES
+    ]
     return templates.TemplateResponse(
         request=request,
         name="admin/user_detail.html",
@@ -159,7 +194,9 @@ def user_detail_page(
             admin,
             user=user,
             entitlement_rows=entitlement_rows,
-            courses=courses,
+            tab="ai" if tab == "ai" else "course",
+            capability_rows=capability_rows,
+            capability_labels=CAPABILITY_LABELS,
             notice=notice,
             error=error,
         ),

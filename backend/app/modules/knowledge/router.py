@@ -19,7 +19,7 @@ from fastapi import (
 )
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
 from backend.app.models import Course
@@ -51,14 +51,20 @@ KNOWLEDGE_UPLOAD = File(...)
 
 
 SOURCE_TYPE_LABELS = {
-    "transcript": "访谈/逐字稿",
-    "article": "文章",
-    "faq": "问答",
-    "notes": "笔记",
+    "transcript": "直播口述整理",
+    "article": "本人撰写",
+    "faq": "社群答疑汇总",
+    "notes": "运营整理",
     "course_material": "课程资料",
     "interview": "采访",
     "pure_qa": "纯 QA 库",
     "other": "其他",
+}
+SOURCE_TYPE_FILTERS = {
+    "live": ("直播口述整理", "transcript"),
+    "community": ("社群答疑汇总", "faq"),
+    "authored": ("本人撰写", "article"),
+    "operations": ("运营整理", "notes"),
 }
 VISIBILITY_LABELS = {"public": "公开", "course": "指定课程", "internal": "内部"}
 STATUS_LABELS = {
@@ -153,19 +159,39 @@ def knowledge_list_page(
     q: str = "",
     lifecycle: str = "",
     source_type: str = "",
+    page: int = 1,
+    size: int = 20,
 ):
     statement = select(KnowledgeSource)
     if q.strip():
         statement = statement.where(KnowledgeSource.title.ilike(f"%{q.strip()}%"))
     if lifecycle in {"draft", "approved", "published", "rejected", "archived"}:
         statement = statement.where(KnowledgeSource.status == lifecycle)
-    if source_type in SOURCE_TYPES:
-        statement = statement.where(KnowledgeSource.source_type == source_type)
+    actual_source_type = SOURCE_TYPE_FILTERS.get(source_type, ("", source_type))[1]
+    if actual_source_type in SOURCE_TYPES:
+        statement = statement.where(KnowledgeSource.source_type == actual_source_type)
+    count_statement = select(func.count()).select_from(statement.subquery())
+    total = int(db.scalar(count_statement) or 0)
+    size = min(100, max(1, size))
+    page = max(1, page)
+    total_pages = max(1, (total + size - 1) // size)
+    page = min(page, total_pages)
     sources = list(
         db.scalars(
             statement.order_by(KnowledgeSource.updated_at.desc(), KnowledgeSource.id)
+            .offset((page - 1) * size)
+            .limit(size)
         )
     )
+    source_counts = {
+        alias: int(
+            db.scalar(
+                select(func.count(KnowledgeSource.id)).where(KnowledgeSource.source_type == actual)
+            )
+            or 0
+        )
+        for alias, (_, actual) in SOURCE_TYPE_FILTERS.items()
+    }
     return templates.TemplateResponse(
         request=request,
         name="admin/knowledge_list.html",
@@ -177,8 +203,17 @@ def knowledge_list_page(
             lifecycle=lifecycle,
             source_type=source_type,
             source_types=SOURCE_TYPE_LABELS,
+            source_type_filters=SOURCE_TYPE_FILTERS,
+            source_counts=source_counts,
+            all_source_count=int(db.scalar(select(func.count(KnowledgeSource.id))) or 0),
             visibility_labels=VISIBILITY_LABELS,
             status_labels=STATUS_LABELS,
+            page=page,
+            size=size,
+            total=total,
+            total_pages=total_pages,
+            start=(page - 1) * size + 1 if total else 0,
+            end=min(page * size, total),
         ),
     )
 
@@ -299,9 +334,7 @@ def knowledge_review_page(
             error=error,
             status_labels=STATUS_LABELS,
             visibility_labels=VISIBILITY_LABELS,
-            courses=list(
-                db.scalars(select(Course).order_by(Course.sort_order, Course.title))
-            ),
+            courses=list(db.scalars(select(Course).order_by(Course.sort_order, Course.title))),
         ),
     )
 
@@ -347,9 +380,7 @@ def knowledge_unit_review(
             keywords=_split_metadata(keywords_text) if keywords_text is not None else None,
             channels=_split_metadata(channels_text) if channels_text is not None else None,
             visibility=visibility,
-            course_ids=(
-                _split_metadata(course_ids_text) if course_ids_text is not None else None
-            ),
+            course_ids=(_split_metadata(course_ids_text) if course_ids_text is not None else None),
         )
     except KnowledgeError as exc:
         return _redirect_error(f"/admin/knowledge/imports/{import_id}", exc)

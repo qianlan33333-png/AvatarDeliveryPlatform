@@ -329,7 +329,7 @@ def test_editing_bound_embedding_identity_creates_pending_generation() -> None:
         assert job.target_model_version == embedding_model_version(pending)
 
 
-def test_admin_binding_switch_stages_pending_and_shows_rebuilding() -> None:
+def test_admin_binding_route_is_not_exposed() -> None:
     with get_session_factory()() as db:
         old_model = _embedding_model(name="绑定旧向量", model_name="binding-old")
         new_model = _embedding_model(name="绑定新向量", model_name="binding-new")
@@ -356,16 +356,17 @@ def test_admin_binding_switch_stages_pending_and_shows_rebuilding() -> None:
             },
             follow_redirects=False,
         )
-        assert saved.status_code == 303
+        assert saved.status_code == 404
         page = client.get("/admin/llm-config")
-        assert "重建中" in page.text
-        assert "当前模型继续服务" in page.text
+        assert "运行场景" not in page.text
+        assert "保存场景绑定" not in page.text
+        assert 'action="/admin/llm-config/bindings"' not in page.text
 
     with get_session_factory()() as db:
         binding = db.scalar(select(AIModelBinding).where(AIModelBinding.scene == "embedding"))
         assert binding is not None
         assert binding.primary_model_id == old_model_id
-        assert binding.pending_primary_model_id == new_model_id
+        assert binding.pending_primary_model_id is None
         assert resolve_model_chain(
             db, scene="embedding", capability="embedding"
         ).primary.id == old_model_id
@@ -376,4 +377,4 @@ def test_admin_binding_switch_stages_pending_and_shows_rebuilding() -> None:
                 )
             )
         )
-        assert len(jobs) == 1
+        assert jobs == []

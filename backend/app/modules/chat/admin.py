@@ -9,9 +9,7 @@ from backend.app.models import AIModelBinding, LLMConfig
 from backend.app.modules.admin.auth import require_csrf
 from backend.app.modules.admin.dependencies import CurrentAdmin, DBSession, admin_context
 from backend.app.modules.ai_models.service import (
-    MODEL_SCENES,
     PROVIDER_PRESETS,
-    SCENE_LABELS,
     embedding_model_version,
     embedding_model_version_from_fields,
     test_model_configuration,
@@ -69,12 +67,6 @@ def llm_config_page(
     error: str = "",
 ):
     configs = list(db.scalars(select(LLMConfig).order_by(LLMConfig.created_at)))
-    bindings = {
-        binding.scene: binding
-        for binding in db.scalars(select(AIModelBinding).order_by(AIModelBinding.scene))
-    }
-    chat_configs = [config for config in configs if config.capability == "chat"]
-    embedding_configs = [config for config in configs if config.capability == "embedding"]
     return templates.TemplateResponse(
         request=request,
         name="admin/llm_config.html",
@@ -82,11 +74,6 @@ def llm_config_page(
             request,
             admin,
             configs=configs,
-            bindings=bindings,
-            scenes=MODEL_SCENES,
-            scene_labels=SCENE_LABELS,
-            chat_configs=chat_configs,
-            embedding_configs=embedding_configs,
             notice=notice,
             error=error,
         ),
@@ -206,9 +193,7 @@ def save_llm_config(
         if capability == "embedding"
         else None
     )
-    embedding_binding = db.scalar(
-        select(AIModelBinding).where(AIModelBinding.scene == "embedding")
-    )
+    embedding_binding = db.scalar(select(AIModelBinding).where(AIModelBinding.scene == "embedding"))
     needs_copy_on_write = bool(
         config.id
         and embedding_binding
@@ -269,76 +254,6 @@ def save_llm_config(
         )
     db.commit()
     return RedirectResponse("/admin/llm-config?notice=saved", status_code=303)
-
-
-@router.post("/llm-config/bindings", include_in_schema=False)
-def save_model_bindings(
-    request: Request,
-    db: DBSession,
-    _: CurrentAdmin,
-    qa_primary: str = Form(""),
-    qa_fallback: str = Form(""),
-    copywriting_primary: str = Form(""),
-    copywriting_fallback: str = Form(""),
-    internal_classifier_primary: str = Form(""),
-    internal_classifier_fallback: str = Form(""),
-    embedding_primary: str = Form(""),
-    embedding_fallback: str = Form(""),
-    csrf_token: str = Form(...),
-):
-    require_csrf(request, csrf_token)
-    posted = {
-        "qa": (qa_primary, qa_fallback),
-        "copywriting": (copywriting_primary, copywriting_fallback),
-        "internal_classifier": (internal_classifier_primary, internal_classifier_fallback),
-        "embedding": (embedding_primary, embedding_fallback),
-    }
-    pending_embedding_model_id: str | None = None
-    published_knowledge_exists = has_published_knowledge(db)
-    for scene, (primary_id, fallback_id) in posted.items():
-        binding = db.scalar(select(AIModelBinding).where(AIModelBinding.scene == scene))
-        binding_was_missing = binding is None
-        if not primary_id:
-            if binding:
-                db.delete(binding)
-            continue
-        expected_capability = "embedding" if scene == "embedding" else "chat"
-        primary = db.get(LLMConfig, primary_id)
-        fallback = db.get(LLMConfig, fallback_id) if fallback_id else None
-        if (
-            not primary
-            or primary.capability != expected_capability
-            or (fallback and fallback.capability != expected_capability)
-            or (fallback and fallback.id == primary.id)
-        ):
-            db.rollback()
-            return RedirectResponse("/admin/llm-config?error=invalid-binding", status_code=303)
-        if not binding:
-            binding = AIModelBinding(scene=scene, primary_model_id=primary.id)
-            db.add(binding)
-        if (
-            scene == "embedding"
-            and binding.primary_model_id != primary.id
-            and published_knowledge_exists
-        ):
-            binding.pending_primary_model_id = primary.id
-            pending_embedding_model_id = primary.id
-        else:
-            binding.primary_model_id = primary.id
-            if scene == "embedding":
-                binding.pending_primary_model_id = None
-                if binding_was_missing and published_knowledge_exists:
-                    pending_embedding_model_id = primary.id
-        binding.fallback_model_id = fallback.id if fallback else None
-    db.flush()
-    if pending_embedding_model_id:
-        queue_published_knowledge_for_reindex(
-            db,
-            model_config_id=pending_embedding_model_id,
-            commit=False,
-        )
-    db.commit()
-    return RedirectResponse("/admin/llm-config?notice=bindings-saved", status_code=303)
 
 
 @router.post("/llm-config/{config_id}/toggle", include_in_schema=False)

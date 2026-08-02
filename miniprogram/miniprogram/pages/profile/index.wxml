@@ -39,6 +39,16 @@
         disabled="{{bindingPhone}}"
         bindgetphonenumber="onGetPhoneNumber"
       >{{bindingPhone ? '绑定中…' : '绑定手机号'}}</button>
+      <view wx:if="{{courseRights.length}}" class="rights-list">
+        <view wx:for="{{courseRights}}" wx:key="course_id" class="right-row"><view><text class="right-name">课程权益</text><text class="right-id">{{item.course_id}}</text></view><text class="right-period">{{item.period}}</text></view>
+      </view>
+    </view>
+
+    <view class="entitlement-card surface-card">
+      <view class="entitlement-head"><text class="entitlement-title">AI 会员</text><text class="entitlement-state">独立权益</text></view>
+      <view class="rights-list">
+        <view wx:for="{{capabilityRights}}" wx:key="code" class="right-row"><view><text class="right-name">{{item.title}}</text><text class="right-id">{{item.period}}</text></view><text class="right-status {{item.status == '有效' ? 'active' : ''}}">{{item.status}}</text></view>
+      </view>
     </view>
 
     <text class="privacy-note">手机号仅用于身份与课程权益匹配</text>

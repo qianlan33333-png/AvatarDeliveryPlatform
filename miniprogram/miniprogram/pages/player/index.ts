@@ -6,6 +6,7 @@ import {
   saveProgress,
 } from '../../services/playback'
 import type { LessonDetail } from '../../types/domain'
+import { ApiRequestError } from '../../services/request'
 
 interface TimeUpdateEvent {
   detail: {
@@ -40,6 +41,8 @@ Page({
     nextLessonId: '',
     loading: true,
     error: '',
+    capacityFull: false,
+    onlineCount: 0,
   },
 
   onLoad(options: Record<string, string | undefined>) {
@@ -68,7 +71,7 @@ Page({
       this.setData({ loading: false, error: '课节参数缺失' })
       return
     }
-    this.setData({ loading: true, error: '' })
+    this.setData({ loading: true, error: '', capacityFull: false, onlineCount: 0 })
     try {
       await getApp<IAppOption>().ensureSession()
       const lesson = await getLesson(this.data.lessonId)
@@ -97,9 +100,17 @@ Page({
       wx.setNavigationBarTitle({ title: lesson.title })
       this.startHeartbeat()
     } catch (error: unknown) {
+      const detail = error instanceof ApiRequestError
+        && typeof error.payload === 'object'
+        && error.payload !== null
+        && 'detail' in error.payload
+        ? (error.payload as { detail?: { code?: string; online_count?: number } }).detail
+        : undefined
       this.setData({
         loading: false,
         error: error instanceof Error ? error.message : '视频加载失败',
+        capacityFull: detail?.code === 'capacity_full',
+        onlineCount: detail?.online_count || 0,
       })
     }
   },

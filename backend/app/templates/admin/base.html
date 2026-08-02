@@ -14,27 +14,33 @@
         <span class="brand-mark">分</span>
         <div>
           <strong>分身交付平台</strong>
-          <small>管理后台</small>
+          <small>ADMIN CONSOLE</small>
         </div>
       </div>
       <nav class="nav-list" aria-label="后台导航">
-        <a class="nav-item {{ 'active' if request.url.path.startswith('/admin/users') else '' }}" href="/admin/users">用户管理</a>
-        <a class="nav-item {{ 'active' if request.url.path.startswith('/admin/courses') else '' }}" href="/admin/courses">课程管理</a>
-        <a class="nav-item {{ 'active' if request.url.path.startswith('/admin/media') else '' }}" href="/admin/media">视频素材</a>
-        <a class="nav-item {{ 'active' if request.url.path.startswith('/admin/entitlements') else '' }}" href="/admin/entitlements">开通记录</a>
-        <a class="nav-item {{ 'active' if request.url.path.startswith('/admin/capabilities') else '' }}" href="/admin/capabilities">AI 会员</a>
-        <a class="nav-item {{ 'active' if request.url.path.startswith('/admin/knowledge') else '' }}" href="/admin/knowledge">分身语料</a>
-        <a class="nav-item {{ 'active' if request.url.path.startswith('/admin/llm-config') else '' }}" href="/admin/llm-config">模型配置</a>
+        <a class="nav-item {{ 'active' if request.url.path.startswith('/admin/users') else '' }}" href="/admin/users"><span>用户管理</span><span class="nav-code">USR</span></a>
+        <a class="nav-item {{ 'active' if request.url.path.startswith('/admin/courses') else '' }}" href="/admin/courses"><span>课程管理</span><span class="nav-code">CRS</span></a>
+        <a class="nav-item {{ 'active' if request.url.path.startswith('/admin/media') else '' }}" href="/admin/media"><span>视频素材</span><span class="nav-code">VOD</span></a>
+        <a class="nav-item {{ 'active' if request.url.path.startswith('/admin/entitlements') else '' }}" href="/admin/entitlements"><span>开通记录</span><span class="nav-code">ENT</span></a>
+        <a class="nav-item {{ 'active' if request.url.path.startswith('/admin/knowledge') else '' }}" href="/admin/knowledge"><span>分身语料</span><span class="nav-code">KNW</span></a>
+        <a class="nav-item {{ 'active' if request.url.path.startswith('/admin/llm-config') else '' }}" href="/admin/llm-config"><span>模型配置</span><span class="nav-code">LLM</span></a>
       </nav>
-      <form class="sidebar-footer" method="post" action="/admin/logout">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <span>{{ admin.username }}</span>
-        <button class="link-button" type="submit">退出</button>
-      </form>
+      <div class="sidebar-bottom">
+        <div class="sidebar-links"><a href="/admin/capabilities">商品映射与 AI 会员 →</a></div>
+        <form class="sidebar-footer" method="post" action="/admin/logout">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <span>{{ admin.username }} · 超级管理员</span>
+          <button class="link-button" type="submit">退出</button>
+        </form>
+      </div>
     </aside>
     <main class="main-content">
       <header class="page-header">
-        <h1>{% block page_title %}{% endblock %}</h1>
+        <div class="page-title-wrap">
+          {% block page_kicker %}{% endblock %}
+          <h1>{% block page_title %}{% endblock %}</h1>
+          {% block page_description %}{% endblock %}
+        </div>
         {% block page_action %}{% endblock %}
       </header>
       <section class="page-body">

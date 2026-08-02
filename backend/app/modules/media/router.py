@@ -7,7 +7,7 @@ from typing import Any
 
 from fastapi import APIRouter, Form, Header, HTTPException, Query, Request, status
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from backend.app.config import get_settings
@@ -40,12 +40,37 @@ def get_asset_or_404(db: Session, asset_id: str) -> VideoAsset:
 
 
 @admin_router.get("/media", response_class=HTMLResponse, include_in_schema=False)
-def media_page(request: Request, db: DBSession, admin: CurrentAdmin):
-    assets = list(db.scalars(select(VideoAsset).order_by(VideoAsset.created_at.desc())))
+def media_page(
+    request: Request,
+    db: DBSession,
+    admin: CurrentAdmin,
+    page: int = 1,
+    size: int = 20,
+):
+    total = int(db.scalar(select(func.count(VideoAsset.id))) or 0)
+    size = min(100, max(1, size))
+    total_pages = max(1, (total + size - 1) // size)
+    page = min(max(1, page), total_pages)
+    assets = list(
+        db.scalars(
+            select(VideoAsset)
+            .order_by(VideoAsset.created_at.desc())
+            .offset((page - 1) * size)
+            .limit(size)
+        )
+    )
     return templates.TemplateResponse(
         request=request,
         name="admin/media.html",
-        context=admin_context(request, admin, assets=assets),
+        context=admin_context(
+            request,
+            admin,
+            assets=assets,
+            page=page,
+            size=size,
+            total=total,
+            total_pages=total_pages,
+        ),
     )
 
 
@@ -85,9 +110,7 @@ def create_media(
     return RedirectResponse(f"/admin/media/{asset.id}/upload", status_code=303)
 
 
-@admin_router.get(
-    "/media/{asset_id}/upload", response_class=HTMLResponse, include_in_schema=False
-)
+@admin_router.get("/media/{asset_id}/upload", response_class=HTMLResponse, include_in_schema=False)
 def upload_media_page(
     asset_id: str,
     request: Request,

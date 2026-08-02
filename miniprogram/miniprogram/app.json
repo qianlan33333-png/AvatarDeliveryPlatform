@@ -11,14 +11,15 @@
   "window": {
     "navigationBarTextStyle": "black",
     "navigationBarTitleText": "分身交付平台",
-    "navigationBarBackgroundColor": "#FDF8E7",
-    "backgroundColor": "#FDF8E7",
+    "navigationBarBackgroundColor": "#FAF9F5",
+    "backgroundColor": "#FAF9F5",
     "backgroundTextStyle": "dark"
   },
   "tabBar": {
-    "color": "#7A7364",
-    "selectedColor": "#9A7200",
-    "backgroundColor": "#FFFDF7",
+    "custom": true,
+    "color": "#8F8B83",
+    "selectedColor": "#C15F3C",
+    "backgroundColor": "#FFFFFF",
     "borderStyle": "white",
     "list": [
       {
@@ -35,6 +36,7 @@
       }
     ]
   },
+  "usingComponents": {},
   "networkTimeout": {
     "request": 10000,
     "connectSocket": 10000

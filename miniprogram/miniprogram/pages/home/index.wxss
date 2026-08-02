@@ -1,144 +1,22 @@
-.home-page {
-  padding-top: 36rpx;
-  padding-bottom: calc(52rpx + constant(safe-area-inset-bottom));
-  padding-bottom: calc(52rpx + env(safe-area-inset-bottom));
-}
-
-.home-guidance {
-  display: block;
-  margin: 4rpx 8rpx 24rpx;
-  color: #777166;
-  font-size: 26rpx;
-}
-
-.status-banner {
-  margin-bottom: 24rpx;
-  padding: 20rpx 24rpx;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20rpx;
-  border: 2rpx solid #f0d5cf;
-  border-radius: 22rpx;
-  background: #fff7f5;
-  color: #9f3b32;
-  font-size: 24rpx;
-}
-
-.status-retry {
-  flex-shrink: 0;
-  color: #805d00;
-  font-weight: 700;
-}
-
-.entry-list {
-  display: flex;
-  flex-direction: column;
-  gap: 28rpx;
-}
-
-.entry-card {
-  min-height: 386rpx;
-  padding: 34rpx;
-  display: flex;
-  flex-direction: column;
-  border: 2rpx solid rgba(224, 169, 60, 0.28);
-  border-radius: 34rpx;
-  box-shadow: 0 16rpx 42rpx rgba(67, 52, 22, 0.08);
-}
-
-.entry-card.light {
-  background: #fffdf7;
-}
-
-.entry-card.yellow {
-  background: linear-gradient(145deg, #f9dc79 0%, #fff3bd 100%);
-}
-
-.entry-card.locked {
-  opacity: 0.84;
-}
-
-.entry-card:active {
-  transform: scale(0.99);
-}
-
-.entry-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-}
-
-.entry-mark {
-  width: 82rpx;
-  height: 82rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 28rpx;
-  background: #f5d060;
-  color: #2d2d2d;
-  font-size: 32rpx;
-  font-weight: 800;
-}
-
-.yellow .entry-mark {
-  background: rgba(255, 255, 255, 0.72);
-}
-
-.entry-state {
-  padding: 9rpx 18rpx;
-  border-radius: 99rpx;
-  background: rgba(255, 255, 255, 0.7);
-  color: #806500;
-  font-size: 22rpx;
-  font-weight: 650;
-}
-
-.entry-state.active {
-  background: #e6f6ea;
-  color: #16803a;
-}
-
-.entry-title,
-.entry-description {
-  display: block;
-}
-
-.entry-title {
-  margin-top: 30rpx;
-  color: #302d28;
-  font-size: 40rpx;
-  font-weight: 750;
-}
-
-.entry-description {
-  margin-top: 14rpx;
-  color: #6f695f;
-  font-size: 27rpx;
-  line-height: 1.65;
-}
-
-.entry-footer {
-  margin-top: auto;
-  padding-top: 28rpx;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20rpx;
-  border-top: 2rpx solid rgba(128, 101, 0, 0.12);
-}
-
-.entry-period {
-  min-width: 0;
-  flex: 1;
-  color: #837b6e;
-  font-size: 22rpx;
-}
-
-.entry-action {
-  flex-shrink: 0;
-  color: #805d00;
-  font-size: 24rpx;
-  font-weight: 700;
-}
+.home-page { padding: 36rpx 28rpx calc(136rpx + env(safe-area-inset-bottom)); background: #faf9f5; }
+.home-guidance { display: block; margin: 2rpx 6rpx 26rpx; color: #8f8b83; font-size: 25rpx; }
+.status-banner { margin-bottom: 22rpx; padding: 18rpx 22rpx; display: flex; align-items: center; justify-content: space-between; gap: 18rpx; border: 2rpx solid #eccfc5; border-radius: 16rpx; background: #f8e9e4; color: #bc4c2e; font-size: 24rpx; }
+.status-retry { flex-shrink: 0; color: #a24a2c; font-weight: 700; }
+.entry-list { display: flex; flex-direction: column; gap: 24rpx; }
+.entry-card { min-height: 330rpx; padding: 30rpx; display: flex; flex-direction: column; border: 2rpx solid #e5e2da; border-radius: 24rpx; background: #fff; box-shadow: 0 2rpx 4rpx rgba(60,50,40,.04); }
+.entry-card.locked { background: #f5f3ed; box-shadow: none; }
+.entry-card:active { background: #fdf9f7; }
+.entry-card.locked:active { background: #efede6; }
+.entry-head { display: flex; align-items: flex-start; justify-content: space-between; }
+.entry-mark { width: 88rpx; height: 88rpx; display: flex; align-items: center; justify-content: center; border-radius: 28rpx; background: #f7ede8; color: #c15f3c; font-family: "Songti SC", serif; font-size: 31rpx; font-weight: 700; }
+.entry-card.locked .entry-mark { background: #efede6; color: #8f8b83; }
+.entry-state { padding: 7rpx 14rpx; border-radius: 12rpx; background: #efede6; color: #6b6862; font-size: 21rpx; font-weight: 650; }
+.entry-state.active { background: #e9efe8; color: #4a6b52; }
+.entry-title, .entry-description { display: block; }
+.entry-title { margin-top: 24rpx; color: #1f1e1d; font-family: "Songti SC", serif; font-size: 42rpx; font-weight: 700; line-height: 1.35; }
+.entry-description { margin-top: 10rpx; color: #6b6862; font-size: 27rpx; line-height: 1.65; }
+.entry-card.locked .entry-title, .entry-card.locked .entry-description { color: #8f8b83; }
+.entry-footer { margin-top: auto; padding-top: 24rpx; display: flex; align-items: center; justify-content: space-between; gap: 18rpx; border-top: 2rpx solid #edeae1; }
+.entry-period { min-width: 0; flex: 1; color: #8f8b83; font-size: 22rpx; }
+.entry-action { flex-shrink: 0; color: #c15f3c; font-size: 24rpx; font-weight: 700; }
+.entry-card.locked .entry-action { color: #8f8b83; }

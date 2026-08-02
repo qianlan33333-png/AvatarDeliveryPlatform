@@ -422,7 +422,8 @@ def test_capability_admin_uses_level_two_mapping_form_and_csrf() -> None:
         assert listing.status_code == 200
         assert listing.text.count("<h1>") == 1
         assert 'href="/admin/capabilities/mappings/new"' in listing.text
-        assert 'name="product_code"' not in listing.text
+        assert 'action="/admin/entitlements/mappings"' in listing.text
+        assert "课程商品码映射" in listing.text
 
         create_page = client.get("/admin/capabilities/mappings/new")
         csrf_match = re.search(r'name="csrf_token" value="([^"]+)"', create_page.text)

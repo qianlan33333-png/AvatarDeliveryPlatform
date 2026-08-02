@@ -1,11 +1,23 @@
 from __future__ import annotations
 
+import csv
+import io
+from datetime import UTC, datetime
+from urllib.parse import quote
+
 from fastapi import APIRouter, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy import select
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
+from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 
-from backend.app.models import Course, Lesson, VideoAsset
+from backend.app.models import (
+    Course,
+    CourseEntitlement,
+    LearningProgress,
+    Lesson,
+    User,
+    VideoAsset,
+)
 from backend.app.modules.admin.auth import require_csrf
 from backend.app.modules.admin.dependencies import CurrentAdmin, DBSession, admin_context
 from backend.app.modules.catalog.service import (
@@ -13,6 +25,7 @@ from backend.app.modules.catalog.service import (
     next_lesson_sort,
     normalize_keywords,
     publish_course,
+    publish_issues,
 )
 from backend.app.web import templates
 
@@ -34,6 +47,7 @@ def render_course_form(
     values: dict[str, object] | None = None,
     error: str = "",
     status_code: int = 200,
+    section: str = "basic",
 ):
     form_values = values or {
         "title": course.title if course else "",
@@ -66,6 +80,7 @@ def render_course_detail(
     error: str = "",
     notice: str = "",
     status_code: int = 200,
+    section: str = "basic",
 ):
     ready_assets = list(
         db.scalars(
@@ -73,6 +88,12 @@ def render_course_detail(
             .where(VideoAsset.status == "ready")
             .order_by(VideoAsset.created_at.desc())
         )
+    )
+    issues = publish_issues(course)
+    preview_ok = any(lesson.is_preview for lesson in course.lessons)
+    videos_ok = bool(course.lessons) and all(
+        lesson.video_asset is not None and lesson.video_asset.status == "ready"
+        for lesson in course.lessons
     )
     return templates.TemplateResponse(
         request=request,
@@ -85,18 +106,212 @@ def render_course_detail(
             next_sort=next_lesson_sort(course),
             error=error,
             notice=notice,
+            section=section if section in {"basic", "lessons", "publish"} else "basic",
+            publish_issues=issues,
+            publish_checks={
+                "basic": bool(course.title.strip() and course.description.strip()),
+                "preview": preview_ok,
+                "videos": videos_ok,
+            },
         ),
         status_code=status_code,
     )
 
 
 @router.get("/courses", response_class=HTMLResponse, include_in_schema=False)
-def courses_page(request: Request, db: DBSession, admin: CurrentAdmin):
-    courses = list(db.scalars(select(Course).order_by(Course.sort_order, Course.created_at.desc())))
+def courses_page(request: Request, db: DBSession, admin: CurrentAdmin, page: int = 1):
+    page = max(1, page)
+    page_size = 20
+    total = int(db.scalar(select(func.count(Course.id))) or 0)
+    courses = list(
+        db.scalars(
+            select(Course)
+            .order_by(Course.sort_order, Course.created_at.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+    )
+    course_ids = [course.id for course in courses]
+    student_counts = (
+        {
+            course_id: int(count)
+            for course_id, count in db.execute(
+                select(CourseEntitlement.course_id, func.count(CourseEntitlement.id))
+                .where(
+                    CourseEntitlement.course_id.in_(course_ids),
+                    CourseEntitlement.status == "active",
+                    CourseEntitlement.user_id.is_not(None),
+                )
+                .group_by(CourseEntitlement.course_id)
+            )
+        }
+        if course_ids
+        else {}
+    )
     return templates.TemplateResponse(
         request=request,
         name="admin/courses.html",
-        context=admin_context(request, admin, courses=courses),
+        context=admin_context(
+            request,
+            admin,
+            courses=courses,
+            student_counts=student_counts,
+            page=page,
+            page_size=page_size,
+            total=total,
+            total_pages=max(1, (total + page_size - 1) // page_size),
+        ),
+    )
+
+
+def _student_rows(db: DBSession, course: Course, keyword: str = "") -> list[dict[str, object]]:
+    statement = (
+        select(CourseEntitlement, User)
+        .join(User, User.id == CourseEntitlement.user_id)
+        .where(CourseEntitlement.course_id == course.id, CourseEntitlement.status == "active")
+    )
+    normalized = keyword.strip()
+    if normalized:
+        like = f"%{normalized}%"
+        statement = statement.where(
+            or_(User.nickname.ilike(like), User.id.ilike(like), User.phone_last4.ilike(like[-4:]))
+        )
+    entitlement_rows = list(db.execute(statement.order_by(CourseEntitlement.effective_at.desc())))
+    published_lessons = [lesson for lesson in course.lessons if lesson.status == "published"]
+    lesson_ids = [lesson.id for lesson in published_lessons]
+    lesson_number = {lesson.id: index for index, lesson in enumerate(published_lessons, start=1)}
+    rows: list[dict[str, object]] = []
+    for entitlement, user in entitlement_rows:
+        progress_items = (
+            list(
+                db.scalars(
+                    select(LearningProgress)
+                    .where(
+                        LearningProgress.user_id == user.id,
+                        LearningProgress.lesson_id.in_(lesson_ids),
+                    )
+                    .order_by(LearningProgress.updated_at.desc())
+                )
+            )
+            if lesson_ids
+            else []
+        )
+        completed = sum(1 for item in progress_items if item.completed)
+        progress_percent = (
+            round(completed * 100 / len(published_lessons)) if published_lessons else 0
+        )
+        current_lesson = max(
+            (lesson_number.get(item.lesson_id, 0) for item in progress_items), default=0
+        )
+        rows.append(
+            {
+                "entitlement": entitlement,
+                "user": user,
+                "progress_percent": progress_percent,
+                "current_lesson": current_lesson,
+                "completed": bool(published_lessons) and completed == len(published_lessons),
+                "started": bool(progress_items),
+                "last_learning_at": progress_items[0].updated_at if progress_items else None,
+            }
+        )
+    return rows
+
+
+@router.get("/courses/{course_id}/students", response_class=HTMLResponse, include_in_schema=False)
+def course_students_page(
+    course_id: str,
+    request: Request,
+    db: DBSession,
+    admin: CurrentAdmin,
+    q: str = "",
+    page: int = 1,
+    selected_course_id: str = "",
+):
+    course = get_course_or_404(db, course_id)
+    if (
+        selected_course_id
+        and selected_course_id != course_id
+        and db.get(Course, selected_course_id)
+    ):
+        return RedirectResponse(
+            f"/admin/courses/{selected_course_id}/students?q={quote(q.strip())}", status_code=303
+        )
+    all_rows = _student_rows(db, course, q)
+    page = max(1, page)
+    page_size = 20
+    start = (page - 1) * page_size
+    now = datetime.now(UTC)
+    active_7d = sum(
+        1
+        for row in all_rows
+        if row["last_learning_at"]
+        and (
+            now
+            - (
+                row["last_learning_at"]
+                if row["last_learning_at"].tzinfo
+                else row["last_learning_at"].replace(tzinfo=UTC)
+            )
+        ).days
+        < 7
+    )
+    return templates.TemplateResponse(
+        request=request,
+        name="admin/course_students.html",
+        context=admin_context(
+            request,
+            admin,
+            course=course,
+            courses=list(db.scalars(select(Course).order_by(Course.sort_order, Course.title))),
+            student_rows=all_rows[start : start + page_size],
+            q=q.strip(),
+            page=page,
+            page_size=page_size,
+            total=len(all_rows),
+            total_pages=max(1, (len(all_rows) + page_size - 1) // page_size),
+            stats={
+                "active": len(all_rows),
+                "started": sum(1 for row in all_rows if row["started"]),
+                "completed": sum(1 for row in all_rows if row["completed"]),
+                "active_7d": active_7d,
+            },
+        ),
+    )
+
+
+@router.get("/courses/{course_id}/students.csv", include_in_schema=False)
+def course_students_csv(
+    course_id: str,
+    db: DBSession,
+    _: CurrentAdmin,
+    q: str = "",
+):
+    course = get_course_or_404(db, course_id)
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(
+        ["用户ID", "昵称", "手机号", "开通时间", "学习进度", "当前课节", "最后学习", "来源订单"]
+    )
+    for row in _student_rows(db, course, q):
+        user = row["user"]
+        entitlement = row["entitlement"]
+        writer.writerow(
+            [
+                user.id,
+                user.nickname or "未命名用户",
+                f"****{user.phone_last4}" if user.phone_last4 else "未绑定",
+                entitlement.effective_at.isoformat(),
+                f"{row['progress_percent']}%",
+                row["current_lesson"],
+                row["last_learning_at"].isoformat() if row["last_learning_at"] else "",
+                entitlement.source_order_id,
+            ]
+        )
+    payload = "\ufeff" + output.getvalue()
+    return StreamingResponse(
+        iter([payload]),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="course-{course.id}-students.csv"'},
     )
 
 
@@ -134,9 +349,7 @@ def create_course(
     try:
         normalized_keywords = normalize_keywords(keywords)
     except CatalogValidationError as exc:
-        return render_course_form(
-            request, admin, values=values, error=str(exc), status_code=422
-        )
+        return render_course_form(request, admin, values=values, error=str(exc), status_code=422)
     course = Course(
         title=str(values["title"]),
         subtitle=str(values["subtitle"]),
@@ -157,6 +370,7 @@ def edit_course_page(
     db: DBSession,
     admin: CurrentAdmin,
     notice: str = "",
+    section: str = "basic",
 ):
     return render_course_detail(
         request,
@@ -164,6 +378,7 @@ def edit_course_page(
         admin,
         get_course_or_404(db, course_id),
         notice=notice,
+        section=section,
     )
 
 
@@ -190,9 +405,7 @@ def update_course(
     try:
         course.keywords = normalize_keywords(keywords)
     except CatalogValidationError as exc:
-        return render_course_detail(
-            request, db, admin, course, error=str(exc), status_code=422
-        )
+        return render_course_detail(request, db, admin, course, error=str(exc), status_code=422)
     course.title = title.strip()
     course.subtitle = subtitle.strip()
     course.description = description.strip()
@@ -215,9 +428,7 @@ def publish(
     try:
         publish_course(db, course)
     except CatalogValidationError as exc:
-        return render_course_detail(
-            request, db, admin, course, error=str(exc), status_code=422
-        )
+        return render_course_detail(request, db, admin, course, error=str(exc), status_code=422)
     return RedirectResponse(f"/admin/courses/{course.id}/edit?notice=published", status_code=303)
 
 

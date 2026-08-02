@@ -7,7 +7,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from backend.app.models import User
+from backend.app.models import Course, ProductCourseMapping, User
 from backend.app.modules.admin.auth import require_csrf
 from backend.app.modules.admin.dependencies import CurrentAdmin, DBSession, admin_context
 from backend.app.modules.capabilities.models import (
@@ -43,6 +43,16 @@ def capabilities_page(
             )
         )
     )
+    course_mappings = list(
+        db.execute(
+            select(ProductCourseMapping, Course)
+            .join(Course, Course.id == ProductCourseMapping.course_id)
+            .order_by(ProductCourseMapping.product_code, Course.sort_order)
+        )
+    )
+    courses = list(
+        db.scalars(select(Course).where(Course.status != "archived").order_by(Course.sort_order))
+    )
     entitlements = list(
         db.scalars(
             select(CapabilityEntitlement)
@@ -51,10 +61,11 @@ def capabilities_page(
         )
     )
     user_ids = {item.user_id for item in entitlements if item.user_id}
-    users = {
-        user.id: user
-        for user in db.scalars(select(User).where(User.id.in_(user_ids)))
-    } if user_ids else {}
+    users = (
+        {user.id: user for user in db.scalars(select(User).where(User.id.in_(user_ids)))}
+        if user_ids
+        else {}
+    )
     entitlement_rows = [
         {
             "entitlement": entitlement,
@@ -70,8 +81,19 @@ def capabilities_page(
             request,
             admin,
             mappings=mappings,
+            course_mappings=course_mappings,
+            courses=courses,
             entitlement_rows=entitlement_rows,
             capability_labels=CAPABILITY_LABELS,
+            capability_stats={
+                code: sum(
+                    1
+                    for row in entitlement_rows
+                    if row["entitlement"].capability_code == code
+                    and row["display_status"] == "active"
+                )
+                for code in CAPABILITY_CODES
+            },
             notice=notice,
             error=error,
         ),
@@ -167,37 +189,7 @@ def capability_user_page(
     notice: str = "",
     error: str = "",
 ):
-    user = db.get(User, user_id)
-    if user is None:
-        return RedirectResponse("/admin/users", status_code=303)
-    entitlements = {
-        item.capability_code: item
-        for item in db.scalars(
-            select(CapabilityEntitlement).where(CapabilityEntitlement.user_id == user.id)
-        )
-    }
-    entitlement_rows = [
-        {
-            "code": code,
-            "entitlement": entitlements.get(code),
-            "display_status": capability_entitlement_status(entitlements.get(code)),
-        }
-        for code in CAPABILITY_CODES
-    ]
-    return templates.TemplateResponse(
-        request=request,
-        name="admin/capability_user_detail.html",
-        context=admin_context(
-            request,
-            admin,
-            user=user,
-            entitlement_rows=entitlement_rows,
-            capability_codes=CAPABILITY_CODES,
-            capability_labels=CAPABILITY_LABELS,
-            notice=notice,
-            error=error,
-        ),
-    )
+    return RedirectResponse(f"/admin/users/{user_id}?tab=ai", status_code=301)
 
 
 @router.post("/users/{user_id}/entitlements", include_in_schema=False)
@@ -215,12 +207,12 @@ def set_user_capability(
     user = db.get(User, user_id)
     if user is None or action not in {"grant", "renew", "revoke"}:
         return RedirectResponse(
-            f"/admin/capabilities/users/{user_id}?error=invalid",
+            f"/admin/users/{user_id}?tab=ai&error=invalid",
             status_code=303,
         )
     if duration_days < 0 or duration_days > 3650:
         return RedirectResponse(
-            f"/admin/capabilities/users/{user_id}?error=duration",
+            f"/admin/users/{user_id}?tab=ai&error=duration",
             status_code=303,
         )
     now = datetime.now(UTC)
@@ -251,10 +243,10 @@ def set_user_capability(
         )
     except CapabilityEntitlementError:
         return RedirectResponse(
-            f"/admin/capabilities/users/{user_id}?error=entitlement",
+            f"/admin/users/{user_id}?tab=ai&error=entitlement",
             status_code=303,
         )
     return RedirectResponse(
-        f"/admin/capabilities/users/{user_id}?notice=entitlement",
+        f"/admin/users/{user_id}?tab=ai&notice=entitlement",
         status_code=303,
     )

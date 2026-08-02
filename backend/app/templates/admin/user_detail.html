@@ -1,35 +1,30 @@
 {% extends "admin/base.html" %}
-{% block title %}用户课程权益 - 分身交付平台{% endblock %}
-{% block page_title %}用户课程权益{% endblock %}
-{% block page_action %}<div class="inline-actions"><a class="btn btn-primary" href="/admin/capabilities/users/{{ user.id }}">管理 AI 权益</a><a class="btn btn-secondary" href="/admin/users">返回用户列表</a></div>{% endblock %}
+{% block title %}{{ user.nickname or '未命名用户' }} - 分身交付平台{% endblock %}
+{% block page_kicker %}<span class="page-kicker mono">{{ user.id }}</span>{% endblock %}
+{% block page_title %}{{ user.nickname or '未命名用户' }}{% endblock %}
+{% block page_description %}<p class="page-description">手机号 {{ ('****' ~ user.phone_last4) if user.phone_last4 else '未绑定' }} · {{ '微信已授权' if user.identities else '微信未授权' }} · 注册于 {{ user.created_at.strftime('%Y-%m-%d') if user.created_at else '-' }}</p>{% endblock %}
+{% block page_action %}<div class="inline-actions"><form method="post" action="/admin/users/{{ user.id }}/toggle"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn {{ 'btn-danger' if user.is_active else 'btn-secondary' }}" type="submit">{{ '禁用用户' if user.is_active else '启用用户' }}</button></form><a class="btn btn-secondary" href="/admin/users">返回用户列表</a></div>{% endblock %}
 {% block content %}
-{% if notice %}<div class="alert alert-success">课程权益已更新</div>{% endif %}
+{% if notice %}<div class="alert alert-success">权益已更新</div>{% endif %}
 {% if error %}<div class="alert alert-error">操作失败：请确认用户已绑定手机号且参数有效</div>{% endif %}
 
-<div class="detail-header">
-  <div><span class="eyebrow">{{ user.id }}</span><h2>{{ user.nickname or '未命名用户' }}</h2><p class="form-help">手机号：{{ ('****' ~ user.phone_last4) if user.phone_last4 else '未绑定' }}</p></div>
-  <span class="badge {{ 'badge-success' if user.is_active else 'badge-muted' }}">{{ '正常' if user.is_active else '已禁用' }}</span>
-</div>
+<nav class="tab-strip" aria-label="用户权益类型">
+  <a class="{{ 'active' if tab == 'course' else '' }}" href="/admin/users/{{ user.id }}?tab=course">课程权益</a>
+  <a class="{{ 'active' if tab == 'ai' else '' }}" href="/admin/users/{{ user.id }}?tab=ai">AI 会员权益</a>
+</nav>
 
-<form class="form-card compact-form-grid" method="post" action="/admin/users/{{ user.id }}/entitlements">
-  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-  <label class="field"><span>课程</span><select name="course_id" required><option value="">请选择课程</option>{% for course in courses %}<option value="{{ course.id }}">{{ course.title }}</option>{% endfor %}</select></label>
-  <label class="field"><span>操作</span><select name="action"><option value="grant">手工开通</option><option value="revoke">手工撤销</option></select></label>
-  <label class="field"><span>有效天数</span><input type="number" name="duration_days" min="0" max="3650" value="0"><small class="form-help">0 表示长期有效；撤销时忽略</small></label>
-  <button class="btn btn-primary" type="submit">确认操作</button>
-</form>
-
-<div class="section-heading"><div><span class="eyebrow">CURRENT ACCESS</span><h2>当前权益</h2></div></div>
-<div class="table-card">
-  <table class="data-table">
-    <thead><tr><th>课程</th><th>状态</th><th>生效时间</th><th>到期时间</th><th>来源订单</th></tr></thead>
-    <tbody>
-    {% for entitlement, course in entitlement_rows %}
-      <tr><td><strong>{{ course.title }}</strong></td><td><span class="badge {{ 'badge-success' if entitlement.status == 'active' else 'badge-danger' }}">{{ entitlement.status }}</span></td><td>{{ entitlement.effective_at.strftime('%Y-%m-%d %H:%M') }}</td><td>{{ entitlement.expires_at.strftime('%Y-%m-%d %H:%M') if entitlement.expires_at else '长期' }}</td><td>{{ entitlement.source_order_id or '-' }}</td></tr>
-    {% else %}
-      <tr><td colspan="5"><div class="empty-state">当前没有课程权益</div></td></tr>
-    {% endfor %}
-    </tbody>
-  </table>
+{% if tab == 'course' %}
+<div class="section-heading first-section"><div><span class="eyebrow">CURRENT ACCESS</span><h2>当前课程权益</h2></div></div>
+<div class="table-card"><table class="data-table"><thead><tr><th>课程</th><th>状态</th><th>生效时间</th><th>到期时间</th><th>来源订单</th></tr></thead><tbody>
+{% for entitlement, course in entitlement_rows %}<tr><td><strong>{{ course.title }}</strong></td><td><span class="badge {{ 'badge-success' if entitlement.status == 'active' else 'badge-danger' }}">{{ {'active':'有效','revoked':'已撤销'}.get(entitlement.status, entitlement.status) }}</span></td><td>{{ entitlement.effective_at.strftime('%Y-%m-%d %H:%M') }}</td><td>{{ entitlement.expires_at.strftime('%Y-%m-%d %H:%M') if entitlement.expires_at else '长期' }}</td><td class="mono">{{ entitlement.source_order_id or '-' }}</td></tr>{% else %}<tr><td colspan="5"><div class="empty-state"><span class="empty-symbol">课</span><strong class="state-title">当前没有课程权益</strong><span class="state-copy">课程权益可由外部商品 webhook 开通。</span></div></td></tr>{% endfor %}
+</tbody></table></div>
+{% else %}
+<div class="capability-grid">
+{% for row in capability_rows %}{% set entitlement = row.entitlement %}
+  <article class="capability-card"><div class="detail-header"><div><span class="eyebrow">{{ row.code }}</span><h3>{{ capability_labels.get(row.code, row.code) }}</h3></div><span class="badge {{ 'badge-success' if row.display_status == 'active' else ('badge-danger' if row.display_status in ['revoked','expired'] else 'badge-muted') }}">{{ {'active':'有效','upcoming':'待生效','expired':'已到期','revoked':'已撤销','missing':'未开通'}.get(row.display_status, row.display_status) }}</span></div><p>{{ ('有效期至 ' ~ entitlement.expires_at.strftime('%Y-%m-%d')) if entitlement and entitlement.expires_at else ('长期有效' if entitlement else '尚未开通') }}</p><form class="form-grid" method="post" action="/admin/capabilities/users/{{ user.id }}/entitlements"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="capability_code" value="{{ row.code }}"><label class="field"><span>操作</span><select name="action"><option value="grant">开通</option><option value="renew">续期</option><option value="revoke">撤销</option></select></label><label class="field"><span>有效天数</span><input type="number" name="duration_days" min="0" max="3650" value="365"></label><div class="form-actions field-wide"><button class="btn btn-primary" type="submit">确认操作</button></div></form></article>
+{% endfor %}
 </div>
+<div class="section-heading"><div><span class="eyebrow">GRANT HISTORY</span><h2>授予历史</h2></div></div>
+<div class="table-card"><table class="data-table"><thead><tr><th>更新时间</th><th>能力</th><th>动作</th><th>操作人</th><th>来源</th></tr></thead><tbody>{% for row in capability_rows %}{% if row.entitlement %}<tr><td>{{ row.entitlement.updated_at.strftime('%Y-%m-%d %H:%M') }}</td><td>{{ capability_labels.get(row.code, row.code) }}</td><td>{{ {'grant':'开通','renew':'续期','revoke':'撤销'}.get(row.entitlement.last_event_action, row.entitlement.last_event_action or '开通') }}</td><td>系统</td><td class="mono">{{ row.entitlement.source_order_id or '人工操作' }}</td></tr>{% endif %}{% else %}<tr><td colspan="5"><div class="empty-state">暂无 AI 权益记录</div></td></tr>{% endfor %}</tbody></table></div>
+{% endif %}
 {% endblock %}

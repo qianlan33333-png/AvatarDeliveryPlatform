@@ -10,7 +10,7 @@ interface AiEntryDefinition {
   title: string
   description: string
   route: string
-  tone: 'light' | 'yellow'
+  tone: 'light' | 'muted'
 }
 
 interface AiEntry extends AiEntryDefinition {
@@ -35,7 +35,7 @@ const ENTRY_DEFINITIONS: AiEntryDefinition[] = [
     title: '帮我写话术',
     description: '说清对象、渠道和目标，连续调整到可以直接使用。',
     route: '/pages/copywriting/index',
-    tone: 'yellow',
+    tone: 'muted',
   },
 ]
 
