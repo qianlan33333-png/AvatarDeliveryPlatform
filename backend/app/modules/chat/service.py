@@ -23,10 +23,11 @@ from backend.app.modules.ai_models.service import (
 )
 from backend.app.modules.capabilities.service import capability_is_active
 from backend.app.modules.entitlements.service import user_has_course_access
-from backend.app.modules.knowledge.service import (
-    format_knowledge_context,
-    retrieve_knowledge,
-    retrieve_strict_qa,
+from backend.app.modules.knowledge.v2_markdown import DIMENSIONS, DOMAINS
+from backend.app.modules.knowledge.v2_retrieval import (
+    format_v2_context,
+    retrieve_strict_qa_v2,
+    retrieve_v2_knowledge,
 )
 from backend.app.security import decrypt_value
 
@@ -63,6 +64,67 @@ class RuntimeKnowledge:
     degraded: bool
     strict_answer: str = ""
     images: tuple[dict[str, str], ...] = ()
+
+
+def _classify_v2_query(
+    db: Session,
+    *,
+    prompt: str,
+    settings: Settings,
+) -> tuple[list[str], list[str], bool]:
+    fallback = (["values", "methods", "facts"], [], True)
+    chain = resolve_model_chain(db, scene="internal_classifier", capability="chat")
+    for config in (item for item in (chain.primary, chain.fallback) if item is not None):
+        try:
+            validate_model_configuration(
+                provider=config.provider,
+                capability=config.capability,
+                base_url=config.base_url,
+                model_name=config.model_name,
+                embedding_dimension=config.embedding_dimension,
+                settings=settings,
+            )
+            api_key = decrypt_value(
+                config.api_key_ciphertext,
+                purpose="llm-api-key",
+                key_material=settings.llm_encryption_key,
+                settings=settings,
+            )
+            client = OpenAI(
+                api_key=api_key,
+                base_url=config.base_url,
+                timeout=min(settings.llm_request_timeout_seconds, 8),
+            )
+            completion = client.chat.completions.create(
+                model=config.model_name,
+                temperature=0,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "你只做知识路由分类，不回答问题。dimensions 必须从 "
+                            + json.dumps(list(DIMENSIONS), ensure_ascii=False)
+                            + " 中选择2到4个；domains从 "
+                            + json.dumps(list(DOMAINS), ensure_ascii=False)
+                            + ' 中选择0到3个。只输出JSON：{"dimensions":[],"domains":[]}。'
+                        ),
+                    },
+                    {"role": "user", "content": prompt[:1000]},
+                ],
+                **_completion_overrides(config),
+            )
+            parsed = _parse_json_answer(completion.choices[0].message.content or "")
+            dimensions = list(
+                dict.fromkeys(item for item in parsed.get("dimensions", []) if item in DIMENSIONS)
+            )
+            domains = list(
+                dict.fromkeys(item for item in parsed.get("domains", []) if item in DOMAINS)
+            )
+            if 2 <= len(dimensions) <= 4 and len(domains) <= 3:
+                return dimensions, domains, False
+        except Exception:
+            continue
+    return fallback
 
 
 def _completion_overrides(llm_config: LLMConfig) -> dict[str, Any]:
@@ -168,27 +230,20 @@ def retrieve_runtime_knowledge(
 
     if mode == "qa":
         try:
-            strict_result = retrieve_strict_qa(
+            strict_result = retrieve_strict_qa_v2(
                 db,
                 user_id=user.id,
                 query=prompt,
             )
         except Exception:
             strict_result = None
-        if strict_result is not None and strict_result.units:
-            unit = strict_result.units[0]
+        if strict_result is not None:
             return RuntimeKnowledge(
                 context="",
-                unit_ids=[unit.id],
+                unit_ids=[strict_result.id],
                 degraded=False,
-                strict_answer=unit.standard_answer or unit.content,
-                images=tuple(
-                    {
-                        "url": image.public_url,
-                        "alt_text": image.alt_text,
-                    }
-                    for image in sorted(unit.images, key=lambda item: item.sort_order)
-                ),
+                strict_answer=strict_result.answer,
+                images=strict_result.images,
             )
 
     query_embedding: list[float] | None = None
@@ -203,24 +258,29 @@ def retrieve_runtime_knowledge(
             break
         except Exception:
             continue
+    dimensions, domains, classification_degraded = _classify_v2_query(
+        db, prompt=prompt, settings=configured
+    )
     try:
-        result = retrieve_knowledge(
+        result = retrieve_v2_knowledge(
             db,
             user_id=user.id,
             query=prompt,
             mode=mode,
+            dimensions=dimensions,
+            domains=domains,
             query_embedding=query_embedding,
             embedding_model_name=embedding_model_name,
         )
     except Exception:
         return RuntimeKnowledge(context="", unit_ids=[], degraded=True)
     return RuntimeKnowledge(
-        context=format_knowledge_context(
+        context=format_v2_context(
             result,
             max_chars=configured.knowledge_context_max_chars,
         ),
-        unit_ids=[unit.id for unit in result.units],
-        degraded=result.degraded,
+        unit_ids=[item.id for item in result.references],
+        degraded=result.degraded or classification_degraded,
     )
 
 
@@ -370,7 +430,7 @@ def generate_llm_answer(
             "事实知识才可决定说什么；不得把风格样本中的经历当作事实。"
             "不得编造本人经历、客户案例、成绩或课程内容。"
             "如果缺少对象、渠道或目标，先追问一个最关键的问题。"
-            "输出严格JSON：{\"answer\":\"话术或追问\",\"course_ids\":[]}。"
+            '输出严格JSON：{"answer":"话术或追问","course_ids":[]}。'
         )
     else:
         runtime_policy = (
@@ -378,7 +438,7 @@ def generate_llm_answer(
             "内容作为依据；没有可靠依据时必须明确说没有可靠资料。"
             "你只能从给定候选课程中推荐，不得虚构课程或课程ID。"
             "未购课程只允许使用公开简介，不得推测或泄露付费课节内容。"
-            "输出严格JSON：{\"answer\":\"回答\",\"course_ids\":[\"候选ID\"]}，"
+            '输出严格JSON：{"answer":"回答","course_ids":["候选ID"]}，'
             "course_ids最多3个。候选课程如下："
             + json.dumps(candidate_payload, ensure_ascii=False, separators=(",", ":"))
         )

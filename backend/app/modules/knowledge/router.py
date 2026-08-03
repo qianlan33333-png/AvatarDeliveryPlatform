@@ -25,23 +25,37 @@ from sqlalchemy.orm import selectinload
 from backend.app.models import Course
 from backend.app.modules.admin.auth import require_csrf
 from backend.app.modules.admin.dependencies import CurrentAdmin, DBSession, admin_context
-from backend.app.modules.knowledge.markdown import SOURCE_TYPES
-from backend.app.modules.knowledge.models import KnowledgeSource
+from backend.app.modules.knowledge.models import KnowledgeImport, KnowledgeSource
 from backend.app.modules.knowledge.service import (
     KnowledgeConflictError,
     KnowledgeError,
     KnowledgeNotFoundError,
     archive_knowledge_source,
-    create_knowledge_source,
     create_knowledge_source_version,
     export_source_markdown,
     get_knowledge_import,
+    get_source_version,
     import_cleaned_markdown,
-    list_ready_sources,
     mark_source_ready_for_agent,
     publish_knowledge_import,
     reject_knowledge_import,
     review_knowledge_unit,
+)
+from backend.app.modules.knowledge.v2_markdown import (
+    CONTENT_TYPE_LABELS,
+    DIMENSION_LABELS,
+    DOMAIN_LABELS,
+)
+from backend.app.modules.knowledge.v2_markdown import (
+    SCHEMA_VERSION as V2_SCHEMA_VERSION,
+)
+from backend.app.modules.knowledge.v2_service import (
+    create_v2_source,
+    export_v2_source,
+    import_v2_markdown,
+    list_v2_ready_sources,
+    publish_v2_import,
+    review_v2_item,
 )
 from backend.app.web import templates
 
@@ -74,6 +88,21 @@ STATUS_LABELS = {
     "rejected": "已驳回",
     "archived": "已归档",
 }
+PROCESSING_LABELS = {
+    "not_ready": "未开始",
+    "ready_for_agent": "清洗中",
+    "imported": "待审核",
+    "rejected": "需修订",
+    "published": "已完成",
+}
+
+
+def _project_cleaning_status(source: KnowledgeSource) -> str:
+    if source.status == "published":
+        return "published"
+    if source.status == "rejected":
+        return "rejected"
+    return source.processing_status
 
 
 def _split_course_ids(values: list[str]) -> list[str]:
@@ -157,19 +186,12 @@ def knowledge_list_page(
     db: DBSession,
     admin: CurrentAdmin,
     q: str = "",
-    lifecycle: str = "",
-    source_type: str = "",
     page: int = 1,
     size: int = 20,
 ):
-    statement = select(KnowledgeSource)
+    statement = select(KnowledgeSource).where(KnowledgeSource.schema_version == V2_SCHEMA_VERSION)
     if q.strip():
         statement = statement.where(KnowledgeSource.title.ilike(f"%{q.strip()}%"))
-    if lifecycle in {"draft", "approved", "published", "rejected", "archived"}:
-        statement = statement.where(KnowledgeSource.status == lifecycle)
-    actual_source_type = SOURCE_TYPE_FILTERS.get(source_type, ("", source_type))[1]
-    if actual_source_type in SOURCE_TYPES:
-        statement = statement.where(KnowledgeSource.source_type == actual_source_type)
     count_statement = select(func.count()).select_from(statement.subquery())
     total = int(db.scalar(count_statement) or 0)
     size = min(100, max(1, size))
@@ -183,15 +205,6 @@ def knowledge_list_page(
             .limit(size)
         )
     )
-    source_counts = {
-        alias: int(
-            db.scalar(
-                select(func.count(KnowledgeSource.id)).where(KnowledgeSource.source_type == actual)
-            )
-            or 0
-        )
-        for alias, (_, actual) in SOURCE_TYPE_FILTERS.items()
-    }
     return templates.TemplateResponse(
         request=request,
         name="admin/knowledge_list.html",
@@ -200,14 +213,8 @@ def knowledge_list_page(
             admin,
             sources=sources,
             q=q,
-            lifecycle=lifecycle,
-            source_type=source_type,
-            source_types=SOURCE_TYPE_LABELS,
-            source_type_filters=SOURCE_TYPE_FILTERS,
-            source_counts=source_counts,
-            all_source_count=int(db.scalar(select(func.count(KnowledgeSource.id))) or 0),
-            visibility_labels=VISIBILITY_LABELS,
-            status_labels=STATUS_LABELS,
+            processing_labels=PROCESSING_LABELS,
+            project_cleaning_status=_project_cleaning_status,
             page=page,
             size=size,
             total=total,
@@ -226,8 +233,8 @@ def knowledge_new_page(request: Request, db: DBSession, admin: CurrentAdmin):
         db,
         form_values={
             "title": "",
-            "source_type": "transcript",
-            "visibility": "public",
+            "source_type": "material",
+            "visibility": "internal",
             "course_ids": [],
             "raw_content": "",
             "confirmed_facts": "",
@@ -247,13 +254,12 @@ async def knowledge_create(
 ):
     form = await request.form()
     require_csrf(request, str(form.get("csrf_token", "")))
-    values = _source_form_values(form)
+    values = {
+        "title": str(form.get("title", "")),
+        "raw_content": str(form.get("raw_content", "")),
+    }
     try:
-        source = create_knowledge_source(
-            db,
-            **{**values, "course_ids": _split_course_ids(values["course_ids"])},
-            created_by=admin.username,
-        )
+        source = create_v2_source(db, **values, created_by=admin.username)
     except KnowledgeError as exc:
         return _render_source_form(
             request,
@@ -321,6 +327,24 @@ def knowledge_review_page(
         knowledge_import = get_knowledge_import(db, import_id)
     except KnowledgeNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    if knowledge_import.schema_version == V2_SCHEMA_VERSION:
+        return templates.TemplateResponse(
+            request=request,
+            name="admin/knowledge_v2_review.html",
+            context=admin_context(
+                request,
+                admin,
+                knowledge_import=knowledge_import,
+                source=knowledge_import.source,
+                version=knowledge_import.source_version,
+                notice=notice,
+                error=error,
+                status_labels=STATUS_LABELS,
+                dimension_labels=DIMENSION_LABELS,
+                domain_labels=DOMAIN_LABELS,
+                content_type_labels=CONTENT_TYPE_LABELS,
+            ),
+        )
     return templates.TemplateResponse(
         request=request,
         name="admin/knowledge_review.html",
@@ -389,6 +413,50 @@ def knowledge_unit_review(
     )
 
 
+@admin_router.post("/imports/{import_id}/{item_kind}/{item_id}/review", include_in_schema=False)
+def knowledge_v2_item_review(
+    import_id: str,
+    item_kind: str,
+    item_id: str,
+    request: Request,
+    db: DBSession,
+    _: CurrentAdmin,
+    decision: str = Form(...),
+    review_note: str = Form(""),
+    title: str | None = Form(None),
+    content: str | None = Form(None),
+    source_evidence: str | None = Form(None),
+    confirmation: str | None = Form(None),
+    primary_domain: str | None = Form(None),
+    secondary_domains_text: str | None = Form(None),
+    content_type: str | None = Form(None),
+    csrf_token: str = Form(...),
+):
+    require_csrf(request, csrf_token)
+    try:
+        review_v2_item(
+            db,
+            item_kind=item_kind,
+            item_id=item_id,
+            decision=decision,
+            review_note=review_note,
+            title=title,
+            content=content,
+            source_evidence=source_evidence,
+            confirmation=confirmation,
+            primary_domain=primary_domain,
+            secondary_domains=_split_metadata(secondary_domains_text)
+            if secondary_domains_text is not None
+            else None,
+            content_type=content_type,
+        )
+    except KnowledgeError as exc:
+        return _redirect_error(f"/admin/knowledge/imports/{import_id}", exc)
+    return RedirectResponse(
+        f"/admin/knowledge/imports/{import_id}?notice=reviewed", status_code=303
+    )
+
+
 @admin_router.post("/imports/{import_id}/publish", include_in_schema=False)
 def knowledge_import_publish(
     import_id: str,
@@ -399,7 +467,11 @@ def knowledge_import_publish(
 ):
     require_csrf(request, csrf_token)
     try:
-        publish_knowledge_import(db, import_id=import_id)
+        item = db.get(KnowledgeImport, import_id)
+        if item and item.schema_version == V2_SCHEMA_VERSION:
+            publish_v2_import(db, import_id=import_id)
+        else:
+            publish_knowledge_import(db, import_id=import_id)
     except KnowledgeError as exc:
         return _redirect_error(f"/admin/knowledge/imports/{import_id}", exc)
     return RedirectResponse(
@@ -441,9 +513,12 @@ def knowledge_detail_page(
         .options(
             selectinload(KnowledgeSource.versions),
             selectinload(KnowledgeSource.imports),
+            selectinload(KnowledgeSource.slices),
+            selectinload(KnowledgeSource.products),
+            selectinload(KnowledgeSource.style_entries),
         )
     )
-    if not source:
+    if not source or source.schema_version != V2_SCHEMA_VERSION:
         raise HTTPException(status_code=404, detail="语料不存在")
     current_version = next(
         (item for item in source.versions if item.version_number == source.current_version_number),
@@ -462,6 +537,12 @@ def knowledge_detail_page(
             source_types=SOURCE_TYPE_LABELS,
             visibility_labels=VISIBILITY_LABELS,
             status_labels=STATUS_LABELS,
+            processing_labels=PROCESSING_LABELS,
+            projected_status=_project_cleaning_status(source),
+            dimension_labels=DIMENSION_LABELS,
+            domain_labels=DOMAIN_LABELS,
+            content_type_labels=CONTENT_TYPE_LABELS,
+            courses=list(db.scalars(select(Course).order_by(Course.sort_order, Course.title))),
         ),
     )
 
@@ -511,7 +592,23 @@ async def knowledge_create_version(
 ):
     form = await request.form()
     require_csrf(request, str(form.get("csrf_token", "")))
-    values = _source_form_values(form)
+    source = db.get(KnowledgeSource, source_id)
+    if source and source.schema_version == V2_SCHEMA_VERSION:
+        current = get_source_version(db, source_id)
+        values = {
+            "title": str(form.get("title", "")),
+            "source_type": "material",
+            "visibility": current.visibility,
+            "course_ids": list(current.course_ids or []),
+            "raw_content": str(form.get("raw_content", "")),
+            "confirmed_facts": current.confirmed_facts,
+            "pending_confirmation_points": current.pending_confirmation_points,
+            "cleaning_requirements": current.cleaning_requirements,
+            "prohibited_content": current.prohibited_content,
+            "source_authorization": current.source_authorization,
+        }
+    else:
+        values = _source_form_values(form)
     try:
         create_knowledge_source_version(
             db,
@@ -533,6 +630,40 @@ async def knowledge_create_version(
     return RedirectResponse(f"/admin/knowledge/{source_id}?notice=versioned", status_code=303)
 
 
+@admin_router.post("/{source_id}/advanced", include_in_schema=False)
+async def knowledge_update_advanced(
+    source_id: str,
+    request: Request,
+    db: DBSession,
+    admin: CurrentAdmin,
+):
+    form = await request.form()
+    require_csrf(request, str(form.get("csrf_token", "")))
+    source = db.get(KnowledgeSource, source_id)
+    if not source or source.schema_version != V2_SCHEMA_VERSION:
+        raise HTTPException(status_code=404, detail="V2 素材不存在")
+    current = get_source_version(db, source_id)
+    try:
+        create_knowledge_source_version(
+            db,
+            source_id=source_id,
+            title=current.title,
+            source_type="material",
+            visibility=str(form.get("visibility", "internal")),
+            course_ids=_split_course_ids(list(form.getlist("course_ids"))),
+            raw_content=current.raw_content,
+            confirmed_facts=str(form.get("confirmed_facts", "")),
+            pending_confirmation_points=str(form.get("pending_confirmation_points", "")),
+            cleaning_requirements=str(form.get("cleaning_requirements", "")),
+            prohibited_content=str(form.get("prohibited_content", "")),
+            source_authorization=str(form.get("source_authorization", "")),
+            created_by=admin.username,
+        )
+    except KnowledgeError as exc:
+        return _redirect_error(f"/admin/knowledge/{source_id}", exc)
+    return RedirectResponse(f"/admin/knowledge/{source_id}?notice=advanced", status_code=303)
+
+
 @admin_router.post("/{source_id}/ready", include_in_schema=False)
 def knowledge_ready(
     source_id: str,
@@ -552,13 +683,52 @@ def knowledge_ready(
 @admin_router.get("/{source_id}/export.md", include_in_schema=False)
 def knowledge_export(source_id: str, db: DBSession, _: CurrentAdmin):
     try:
-        markdown = export_source_markdown(db, source_id)
+        source = db.get(KnowledgeSource, source_id)
+        markdown = (
+            export_v2_source(db, source_id)
+            if source and source.schema_version == V2_SCHEMA_VERSION
+            else export_source_markdown(db, source_id)
+        )
     except KnowledgeNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return PlainTextResponse(
         markdown,
         media_type="text/markdown; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="knowledge-{source_id}.md"'},
+    )
+
+
+@admin_router.post("/{source_id}/import", include_in_schema=False)
+async def knowledge_v2_import_upload(
+    source_id: str,
+    request: Request,
+    db: DBSession,
+    admin: CurrentAdmin,
+    document: UploadFile = KNOWLEDGE_UPLOAD,
+    csrf_token: str = Form(...),
+):
+    require_csrf(request, csrf_token)
+    if not document.filename or not document.filename.lower().endswith((".md", ".markdown")):
+        return RedirectResponse(f"/admin/knowledge/{source_id}?error=文件必须是MD", status_code=303)
+    payload = await document.read(5 * 1024 * 1024 + 1)
+    if len(payload) > 5 * 1024 * 1024:
+        return RedirectResponse(
+            f"/admin/knowledge/{source_id}?error=文件不得超过5MB", status_code=303
+        )
+    try:
+        markdown = payload.decode("utf-8-sig")
+        result = import_v2_markdown(
+            db,
+            markdown=markdown,
+            imported_by=admin.username,
+            expected_source_id=source_id,
+        )
+    except (UnicodeDecodeError, KnowledgeError) as exc:
+        return RedirectResponse(
+            f"/admin/knowledge/{source_id}?error={quote(str(exc))}", status_code=303
+        )
+    return RedirectResponse(
+        f"/admin/knowledge/imports/{result.knowledge_import.id}?notice=imported", status_code=303
     )
 
 
@@ -616,13 +786,12 @@ def internal_knowledge_sources(
     require_knowledge_internal_token(authorization, x_avatar_internal_token)
     if status_filter != "ready_for_agent":
         raise HTTPException(status_code=422, detail="only ready_for_agent is supported")
-    sources = list_ready_sources(db)
+    sources = list_v2_ready_sources(db)
     return {
         "items": [
             {
                 "id": source.id,
                 "title": source.title,
-                "source_type": source.source_type,
                 "visibility": source.visibility,
                 "course_ids": source.course_ids,
                 "version": source.current_version_number,
@@ -648,7 +817,7 @@ def internal_knowledge_export(
     if source.processing_status != "ready_for_agent" or source.status == "archived":
         raise HTTPException(status_code=409, detail="语料尚未标记为待 Agent 清洗")
     try:
-        markdown = export_source_markdown(db, source_id)
+        markdown = export_v2_source(db, source_id)
     except KnowledgeError as exc:
         raise _internal_error(exc) from exc
     return PlainTextResponse(markdown, media_type="text/markdown; charset=utf-8")
@@ -663,7 +832,7 @@ def internal_knowledge_import(
 ):
     require_knowledge_internal_token(authorization, x_avatar_internal_token)
     try:
-        result = import_cleaned_markdown(
+        result = import_v2_markdown(
             db,
             markdown=payload.markdown,
             imported_by="agent",
@@ -679,7 +848,9 @@ def internal_knowledge_import(
         "processor_version": result.knowledge_import.processor_version,
         "status": result.knowledge_import.status,
         "duplicate": not result.created,
-        "unit_count": len(result.knowledge_import.units),
+        "slice_count": len(result.knowledge_import.slices),
+        "product_count": len(result.knowledge_import.products),
+        "style_count": len(result.knowledge_import.style_entries),
     }
 
 
@@ -703,27 +874,34 @@ def internal_knowledge_import_status(
         "processor_version": knowledge_import.processor_version,
         "status": knowledge_import.status,
         "error_message": knowledge_import.error_message,
-        "units": [
+        "slices": [
             {
-                "id": unit.id,
-                "local_id": unit.local_id,
-                "type": unit.unit_type,
-                "confirmation": unit.confirmation,
-                "status": unit.status,
-                "review_note": unit.review_note,
-                "question": unit.standard_question,
-                "answer": unit.standard_answer,
-                "images": [
-                    {
-                        "url": asset.public_url,
-                        "alt_text": asset.alt_text,
-                        "sort_order": asset.sort_order,
-                        "status": asset.status,
-                    }
-                    for asset in unit.assets
-                ],
+                "id": item.id,
+                "local_id": item.local_id,
+                "dimension": item.dimension,
+                "confirmation": item.confirmation,
+                "status": item.status,
+                "review_note": item.review_note,
             }
-            for unit in knowledge_import.units
+            for item in knowledge_import.slices
+        ],
+        "products": [
+            {
+                "id": item.id,
+                "local_id": item.local_id,
+                "type": item.product_type,
+                "status": item.status,
+            }
+            for item in knowledge_import.products
+        ],
+        "style_entries": [
+            {
+                "id": item.id,
+                "local_id": item.local_id,
+                "type": item.entry_type,
+                "status": item.status,
+            }
+            for item in knowledge_import.style_entries
         ],
     }
 

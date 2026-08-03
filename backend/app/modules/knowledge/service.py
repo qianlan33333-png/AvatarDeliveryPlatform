@@ -155,6 +155,7 @@ def create_knowledge_source(
     prohibited_content: str = "",
     source_authorization: str = "",
     created_by: str = "admin",
+    schema_version: str = "avatar-knowledge/v1",
 ) -> KnowledgeSource:
     normalized_course_ids = _validate_source_fields(
         db,
@@ -172,6 +173,7 @@ def create_knowledge_source(
         status="draft",
         processing_status="not_ready",
         current_version_number=1,
+        schema_version=schema_version,
     )
     db.add(source)
     db.flush()
@@ -189,6 +191,7 @@ def create_knowledge_source(
         prohibited_content=prohibited_content,
         source_authorization=source_authorization,
         created_by=created_by,
+        schema_version=schema_version,
     )
     db.add(version)
     db.commit()
@@ -211,6 +214,7 @@ def _build_source_version(
     prohibited_content: str,
     source_authorization: str,
     created_by: str,
+    schema_version: str = "avatar-knowledge/v1",
 ) -> KnowledgeSourceVersion:
     fields = {
         "source_id": source.id,
@@ -242,6 +246,7 @@ def _build_source_version(
         source_authorization=fields["source_authorization"],
         status="draft",
         created_by=created_by,
+        schema_version=schema_version,
     )
 
 
@@ -289,6 +294,7 @@ def create_knowledge_source_version(
         prohibited_content=prohibited_content,
         source_authorization=source_authorization,
         created_by=created_by,
+        schema_version=source.schema_version,
     )
     duplicate = db.scalar(
         select(KnowledgeSourceVersion).where(
@@ -330,9 +336,7 @@ def get_source_version(
     return version
 
 
-def export_source_markdown(
-    db: Session, source_id: str, version_number: int | None = None
-) -> str:
+def export_source_markdown(db: Session, source_id: str, version_number: int | None = None) -> str:
     return export_knowledge_markdown(get_source_version(db, source_id, version_number))
 
 
@@ -397,9 +401,7 @@ def _validate_permission_scope(
         if source_visibility == "course" and not set(unit_course_ids).issubset(source_course_ids):
             raise KnowledgeValidationError(f"{unit.local_id} 扩大了原语料课程范围")
     elif unit_course_ids:
-        raise KnowledgeValidationError(
-            f"{unit.local_id} 的可见范围不允许绑定课程"
-        )
+        raise KnowledgeValidationError(f"{unit.local_id} 的可见范围不允许绑定课程")
     return visibility, _normalize_list(unit_course_ids)
 
 
@@ -610,9 +612,7 @@ def get_knowledge_import(db: Session, import_id: str) -> KnowledgeImport:
     knowledge_import = db.scalar(
         select(KnowledgeImport)
         .where(KnowledgeImport.id == import_id)
-        .options(
-            selectinload(KnowledgeImport.units).selectinload(KnowledgeUnit.assets)
-        )
+        .options(selectinload(KnowledgeImport.units).selectinload(KnowledgeUnit.assets))
     )
     if not knowledge_import:
         raise KnowledgeNotFoundError("导入记录不存在")
@@ -651,9 +651,7 @@ def review_knowledge_unit(
         raise KnowledgeNotFoundError("来源版本不存在")
     next_title = title.strip() if title is not None else unit.title
     next_content = content.strip() if content is not None else unit.content
-    next_evidence = (
-        source_evidence.strip() if source_evidence is not None else unit.source_evidence
-    )
+    next_evidence = source_evidence.strip() if source_evidence is not None else unit.source_evidence
     next_confirmation = confirmation or unit.confirmation
     if next_confirmation not in {"confirmed", "needs_confirmation"}:
         raise KnowledgeValidationError("确认状态不合法")
@@ -679,12 +677,8 @@ def review_knowledge_unit(
     if decision == "approved" and next_confirmation != "confirmed":
         raise KnowledgeConflictError("待确认知识不能审核通过")
     next_aliases = _normalize_list(aliases) if aliases is not None else list(unit.aliases or [])
-    next_keywords = (
-        _normalize_list(keywords) if keywords is not None else list(unit.keywords or [])
-    )
-    next_channels = (
-        _normalize_list(channels) if channels is not None else list(unit.channels or [])
-    )
+    next_keywords = _normalize_list(keywords) if keywords is not None else list(unit.keywords or [])
+    next_channels = _normalize_list(channels) if channels is not None else list(unit.channels or [])
     for label, values, maximum in (
         ("别名", next_aliases, 30),
         ("关键词", next_keywords, 30),
@@ -721,9 +715,7 @@ def review_knowledge_unit(
     )
     if requested_course_ids:
         existing_ids = set(
-            db.scalars(
-                select(Course.id).where(Course.id.in_(requested_course_ids))
-            ).all()
+            db.scalars(select(Course.id).where(Course.id.in_(requested_course_ids))).all()
         )
         missing = sorted(set(requested_course_ids) - existing_ids)
         if missing:
@@ -900,9 +892,7 @@ def _resolve_index_target(
 ) -> tuple[str | None, str]:
     resolved_model_id = model_config_id
     if resolved_model_id is None:
-        binding = db.scalar(
-            select(AIModelBinding).where(AIModelBinding.scene == "embedding")
-        )
+        binding = db.scalar(select(AIModelBinding).where(AIModelBinding.scene == "embedding"))
         resolved_model_id = binding.primary_model_id if binding else None
     config = db.get(LLMConfig, resolved_model_id) if resolved_model_id else None
     if not config or config.capability != "embedding":
@@ -970,11 +960,7 @@ def _ensure_published_import_index_jobs(
 
 def has_published_knowledge(db: Session) -> bool:
     return (
-        db.scalar(
-            select(KnowledgeImport.id)
-            .where(KnowledgeImport.status == "published")
-            .limit(1)
-        )
+        db.scalar(select(KnowledgeImport.id).where(KnowledgeImport.status == "published").limit(1))
         is not None
     )
 
@@ -1103,9 +1089,7 @@ def _promote_pending_embedding_model_if_ready(db: Session) -> bool:
         return False
     target_model_version = embedding_model_version(pending)
     published_import_ids = set(
-        db.scalars(
-            select(KnowledgeImport.id).where(KnowledgeImport.status == "published")
-        )
+        db.scalars(select(KnowledgeImport.id).where(KnowledgeImport.status == "published"))
     )
     if not published_import_ids:
         binding.primary_model_id = pending.id
@@ -1348,9 +1332,7 @@ AND (
 )
 """.strip()
 
-_POSTGRES_SEARCH_DOCUMENT_SQL = (
-    "(COALESCE(ku.title, '') || ' ' || COALESCE(ku.content, ''))"
-)
+_POSTGRES_SEARCH_DOCUMENT_SQL = "(COALESCE(ku.title, '') || ' ' || COALESCE(ku.content, ''))"
 
 
 def _is_postgresql(db: Session) -> bool:
@@ -1379,9 +1361,7 @@ def _bind_postgres_scope_params(statement: Any) -> Any:
     )
 
 
-def _postgres_boundary_query(
-    *, authorized_course_ids: Sequence[str]
-) -> tuple[Any, dict[str, Any]]:
+def _postgres_boundary_query(*, authorized_course_ids: Sequence[str]) -> tuple[Any, dict[str, Any]]:
     statement = _bind_postgres_scope_params(
         text(
             f"""
@@ -1586,9 +1566,7 @@ def _deduplicate_rank(rows: Iterable[Any]) -> list[tuple[str, float]]:
 def _postgres_authorized_boundary_ids(
     db: Session, *, authorized_course_ids: Sequence[str]
 ) -> list[str]:
-    statement, params = _postgres_boundary_query(
-        authorized_course_ids=authorized_course_ids
-    )
+    statement, params = _postgres_boundary_query(authorized_course_ids=authorized_course_ids)
     return [str(row.unit_id) for row in db.execute(statement, params)]
 
 
@@ -1853,9 +1831,7 @@ def _postgres_vector_rank(
         return _deduplicate_rank(db.execute(statement, params))
 
 
-def _load_knowledge_units_by_id(
-    db: Session, unit_ids: Sequence[str]
-) -> dict[str, KnowledgeUnit]:
+def _load_knowledge_units_by_id(db: Session, unit_ids: Sequence[str]) -> dict[str, KnowledgeUnit]:
     unique_ids = list(dict.fromkeys(unit_ids))
     if not unique_ids:
         return {}
@@ -2011,26 +1987,19 @@ def retrieve_knowledge(
         boundaries = [
             unit_by_id[unit_id]
             for unit_id in boundary_ids
-            if unit_id in unit_by_id
-            and unit_by_id[unit_id].unit_type in BOUNDARY_TYPES
+            if unit_id in unit_by_id and unit_by_id[unit_id].unit_type in BOUNDARY_TYPES
         ]
     else:
         unit_by_id = {unit.id: unit for unit in eligible}
         boundaries = [unit for unit in eligible if unit.unit_type in BOUNDARY_TYPES]
-    ranked_units = [
-        unit_by_id[unit_id]
-        for unit_id in ranked_ids
-        if unit_id in unit_by_id
-    ]
+    ranked_units = [unit_by_id[unit_id] for unit_id in ranked_ids if unit_id in unit_by_id]
     selected = _select_by_mode(
         ranked_units,
         boundaries=boundaries,
         mode=mode,
         top_k=resolved_top_k,
     )
-    retrieved = tuple(
-        _retrieved_unit(unit, score=scores.get(unit.id, 0.0)) for unit in selected
-    )
+    retrieved = tuple(_retrieved_unit(unit, score=scores.get(unit.id, 0.0)) for unit in selected)
     return KnowledgeRetrievalResult(
         units=retrieved,
         degraded=degraded,

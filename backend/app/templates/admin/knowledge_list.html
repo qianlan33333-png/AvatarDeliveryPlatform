@@ -1,27 +1,21 @@
 {% extends "admin/base.html" %}
 {% block title %}分身语料 - 分身交付平台{% endblock %}
-{% block page_kicker %}<span class="page-kicker mono">KNOWLEDGE SOURCES</span>{% endblock %}
+{% block page_kicker %}<span class="page-kicker mono">SOURCE MATERIALS</span>{% endblock %}
 {% block page_title %}分身语料{% endblock %}
-{% block page_description %}管理原始语料、清洗版本和发布状态。只有已发布内容会进入 AI 检索。{% endblock %}
-{% block page_action %}<div class="inline-actions"><a class="btn btn-secondary" href="/admin/knowledge/import">导入清洗 MD</a><a class="btn btn-primary" href="/admin/knowledge/new">新增语料</a></div>{% endblock %}
+{% block page_description %}这里只保存原始素材。清洗维度、产品卡和风格结果统一进入素材详情。{% endblock %}
+{% block page_action %}<a class="btn btn-primary" href="/admin/knowledge/new">新增素材</a>{% endblock %}
 {% block content %}
-<div class="split-layout knowledge-layout">
-  <nav class="section-nav source-nav">
-    <a class="{{ 'active' if not source_type else '' }}" href="?q={{ q|urlencode }}&lifecycle={{ lifecycle }}"><span>全部语料</span><small>{{ all_source_count }}</small></a>
-    {% for alias, item in source_type_filters.items() %}<a class="{{ 'active' if source_type == alias else '' }}" href="?source_type={{ alias }}&q={{ q|urlencode }}&lifecycle={{ lifecycle }}"><span>{{ item[0] }}</span><small>{{ source_counts[alias] }}</small></a>{% endfor %}
-  </nav>
-  <div>
-    <form class="toolbar" method="get" action="/admin/knowledge">
-      {% if source_type %}<input type="hidden" name="source_type" value="{{ source_type }}">{% endif %}
-      <input class="search-input" name="q" value="{{ q }}" placeholder="搜索语料标题">
-      <select name="lifecycle"><option value="">全部状态</option>{% for value, label in status_labels.items() %}<option value="{{ value }}" {{ 'selected' if lifecycle == value else '' }}>{{ label }}</option>{% endfor %}</select>
-      <button class="btn btn-secondary" type="submit">筛选</button>
-    </form>
-    <div class="table-card"><table class="data-table"><thead><tr><th>语料</th><th>更新时间</th><th>处理状态</th><th>发布状态</th><th>操作</th></tr></thead><tbody>
-    {% for source in sources %}<tr><td><strong>{{ source.title }}</strong><small class="subline mono">{{ source.id }}</small></td><td>{{ source.updated_at.strftime('%Y-%m-%d %H:%M') if source.updated_at else '-' }}</td><td><span class="badge {{ 'badge-success' if source.processing_status == 'imported' else 'badge-muted' }}">{{ {'not_ready':'未提交清洗','ready_for_agent':'待 Agent 清洗','imported':'已导入'}.get(source.processing_status, source.processing_status) }}</span></td><td><span class="badge {{ 'badge-success' if source.status == 'published' else ('badge-danger' if source.status == 'rejected' else 'badge-muted') }}">{{ status_labels.get(source.status, source.status) }}</span></td><td><a class="btn btn-small btn-secondary" href="/admin/knowledge/{{ source.id }}">查看</a></td></tr>{% else %}<tr><td colspan="5"><div class="empty-state">这个分类还没有语料。</div></td></tr>{% endfor %}
-    </tbody></table></div>
-    <div class="knowledge-notice"><strong>知识注入规则</strong><span>仅已发布、且满足当前用户可见范围的知识会进入问答或话术。</span></div>
-    <div class="pagination-bar"><span>第 {{ start }} – {{ end }} 条，共 {{ total }} 条</span><nav class="pagination"><a class="page-link {{ 'disabled' if page <= 1 else '' }}" href="?source_type={{ source_type }}&q={{ q|urlencode }}&lifecycle={{ lifecycle }}&page={{ page - 1 }}&size={{ size }}">←</a>{% for number in range(1, total_pages + 1) %}<a class="page-link {{ 'active' if number == page else '' }}" href="?source_type={{ source_type }}&q={{ q|urlencode }}&lifecycle={{ lifecycle }}&page={{ number }}&size={{ size }}">{{ number }}</a>{% endfor %}<a class="page-link {{ 'disabled' if page >= total_pages else '' }}" href="?source_type={{ source_type }}&q={{ q|urlencode }}&lifecycle={{ lifecycle }}&page={{ page + 1 }}&size={{ size }}">→</a></nav><span class="pagination-size">每页 {{ size }} 条</span></div>
-  </div>
-</div>
+<form class="toolbar" method="get" action="/admin/knowledge">
+  <input class="search-input" name="q" value="{{ q }}" placeholder="搜索素材名称">
+  <button class="btn btn-secondary" type="submit">搜索</button>
+</form>
+<div class="table-card"><table class="data-table"><thead><tr><th>素材名称</th><th>清洗状态</th><th>更新时间</th><th>操作</th></tr></thead><tbody>
+{% for source in sources %}{% set state = project_cleaning_status(source) %}<tr>
+  <td><strong>{{ source.title }}</strong></td>
+  <td><span class="badge {{ 'badge-success' if state == 'published' else ('badge-danger' if state == 'rejected' else 'badge-muted') }}">{{ processing_labels.get(state, state) }}</span></td>
+  <td>{{ source.updated_at.strftime('%Y-%m-%d %H:%M') if source.updated_at else '-' }}</td>
+  <td><a class="btn btn-small btn-secondary" href="/admin/knowledge/{{ source.id }}">查看</a></td>
+</tr>{% else %}<tr><td colspan="4"><div class="empty-state">还没有 V2 素材。点击“新增素材”，只需填写标题和原文。</div></td></tr>{% endfor %}
+</tbody></table></div>
+<div class="pagination-bar"><span>第 {{ start }} – {{ end }} 条，共 {{ total }} 条</span><nav class="pagination"><a class="page-link {{ 'disabled' if page <= 1 else '' }}" href="?q={{ q|urlencode }}&page={{ page - 1 }}&size={{ size }}">←</a>{% for number in range(1, total_pages + 1) %}<a class="page-link {{ 'active' if number == page else '' }}" href="?q={{ q|urlencode }}&page={{ number }}&size={{ size }}">{{ number }}</a>{% endfor %}<a class="page-link {{ 'disabled' if page >= total_pages else '' }}" href="?q={{ q|urlencode }}&page={{ page + 1 }}&size={{ size }}">→</a></nav><span class="pagination-size">每页 {{ size }} 条</span></div>
 {% endblock %}

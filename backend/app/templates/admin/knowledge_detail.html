@@ -1,34 +1,27 @@
 {% extends "admin/base.html" %}
 {% block title %}{{ source.title }} - 分身交付平台{% endblock %}
-{% block page_title %}语料详情{% endblock %}
-{% block page_action %}<a class="btn btn-secondary" href="/admin/knowledge">返回语料列表</a>{% endblock %}
+{% block page_kicker %}<span class="page-kicker mono">MATERIAL DETAIL</span>{% endblock %}
+{% block page_title %}{{ source.title }}{% endblock %}
+{% block page_description %}单一素材的原文、清洗进度、六维切片、产品卡和表达风格。{% endblock %}
+{% block page_action %}<a class="btn btn-secondary" href="/admin/knowledge">返回素材列表</a>{% endblock %}
 {% block content %}
 {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
-{% if notice %}<div class="alert alert-success">{{ {'created':'语料草稿已保存','versioned':'新版本已生成','ready':'已标记为待 Agent 清洗'}.get(notice, '操作成功') }}</div>{% endif %}
-<div class="detail-header">
-  <div><span class="eyebrow">{{ source.id }}</span><h2>{{ source.title }}</h2><small class="subline">{{ source_types.get(source.source_type, source.source_type) }} · {{ visibility_labels.get(source.visibility, source.visibility) }}</small></div>
-  <div class="inline-actions">
-    <span class="badge {{ 'badge-success' if source.status == 'published' else 'badge-muted' }}">{{ status_labels.get(source.status, source.status) }}</span>
-    {% if source.status != 'archived' %}<a class="btn btn-secondary" href="/admin/knowledge/{{ source.id }}/versions/new">创建新版本</a><a class="btn btn-secondary" href="/admin/knowledge/{{ source.id }}/export.md">导出 MD</a><form method="post" action="/admin/knowledge/{{ source.id }}/ready"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn btn-primary" type="submit">标记待清洗</button></form><form method="post" action="/admin/knowledge/{{ source.id }}/archive"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn btn-danger" type="submit">归档</button></form>{% endif %}
-  </div>
-</div>
-{% if current_version %}
-<div class="form-card">
-  <div class="section-heading first-section"><div><span class="eyebrow">CURRENT VERSION</span><h2>v{{ current_version.version_number }} 输入快照</h2></div><code>{{ current_version.source_sha256 }}</code></div>
-  <div class="form-grid">
-    <div class="field field-wide"><span>原始语料</span><pre>{{ current_version.raw_content }}</pre></div>
-    <div class="field field-wide"><span>已确认事实</span><pre>{{ current_version.confirmed_facts or '-' }}</pre></div>
-    <div class="field field-wide"><span>待确认信息点</span><pre>{{ current_version.pending_confirmation_points or '-' }}</pre></div>
-    <div class="field field-wide"><span>清洗与调整要求</span><pre>{{ current_version.cleaning_requirements or '-' }}</pre></div>
-    <div class="field field-wide"><span>禁止项与引用边界</span><pre>{{ current_version.prohibited_content or '-' }}</pre></div>
-    <div class="field field-wide"><span>来源及授权说明</span><pre>{{ current_version.source_authorization or '-' }}</pre></div>
-  </div>
-</div>
-{% endif %}
-<div class="section-heading"><h2>导入与审核记录</h2><a class="btn btn-small btn-secondary" href="/admin/knowledge/import">导入清洗 MD</a></div>
-<div class="table-card">
-  <table class="data-table"><thead><tr><th>版本</th><th>导入人</th><th>知识数</th><th>状态</th><th>时间</th><th>操作</th></tr></thead><tbody>
-  {% for item in source.imports|sort(attribute='created_at', reverse=true) %}<tr><td>v{{ item.source_version_number }}</td><td>{{ item.imported_by }}</td><td>{{ item.units|length }}</td><td><span class="badge {{ 'badge-success' if item.status == 'published' else ('badge-danger' if item.status == 'rejected' else 'badge-muted') }}">{{ status_labels.get(item.status, item.status) }}</span></td><td>{{ item.created_at }}</td><td><a class="btn btn-small btn-secondary" href="/admin/knowledge/imports/{{ item.id }}">审核</a></td></tr>{% else %}<tr><td colspan="6"><div class="empty-state">尚未导入清洗结果。</div></td></tr>{% endfor %}
-  </tbody></table>
-</div>
+{% if notice %}<div class="alert alert-success">{{ {'created':'素材已保存','versioned':'新版本已生成','advanced':'高级信息已保存为新版本','ready':'已进入 Agent 清洗队列','imported':'清洗结果已导入'}.get(notice, '操作成功') }}</div>{% endif %}
+<div class="detail-header"><div><span class="eyebrow mono">{{ source.id }}</span><h2>清洗状态：{{ processing_labels.get(projected_status, projected_status) }}</h2></div><div class="inline-actions">
+  {% if source.status != 'archived' %}<a class="btn btn-secondary" href="/admin/knowledge/{{ source.id }}/versions/new">新版本</a><a class="btn btn-secondary" href="/admin/knowledge/{{ source.id }}/export.md">导出 V2 MD</a><form method="post" action="/admin/knowledge/{{ source.id }}/ready"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn btn-primary" type="submit">标记待清洗</button></form><form method="post" action="/admin/knowledge/{{ source.id }}/archive"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn btn-danger" type="submit">归档</button></form>{% endif %}
+</div></div>
+
+{% if current_version %}<section class="form-card"><div class="section-heading first-section"><div><span class="eyebrow">RAW SOURCE</span><h2>原始素材 · v{{ current_version.version_number }}</h2></div><code>{{ current_version.source_sha256 }}</code></div><pre>{{ current_version.raw_content }}</pre>
+<details class="advanced-panel"><summary>高级信息</summary><form method="post" action="/admin/knowledge/{{ source.id }}/advanced"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><div class="form-grid"><label class="field"><span>可见范围</span><select name="visibility"><option value="internal" {{ 'selected' if current_version.visibility == 'internal' else '' }}>内部</option><option value="public" {{ 'selected' if current_version.visibility == 'public' else '' }}>公开</option><option value="course" {{ 'selected' if current_version.visibility == 'course' else '' }}>指定课程</option></select></label><label class="field"><span>指定课程</span><select name="course_ids" multiple>{% for course in courses %}<option value="{{ course.id }}" {{ 'selected' if course.id in current_version.course_ids else '' }}>{{ course.title }}</option>{% endfor %}</select></label><label class="field field-wide"><span>已确认事实</span><textarea name="confirmed_facts" rows="5">{{ current_version.confirmed_facts }}</textarea></label><label class="field field-wide"><span>待确认信息点</span><textarea name="pending_confirmation_points" rows="5">{{ current_version.pending_confirmation_points }}</textarea></label><label class="field field-wide"><span>清洗要求</span><textarea name="cleaning_requirements" rows="5">{{ current_version.cleaning_requirements }}</textarea></label><label class="field field-wide"><span>禁止项与引用边界</span><textarea name="prohibited_content" rows="5">{{ current_version.prohibited_content }}</textarea></label><label class="field field-wide"><span>来源及授权说明</span><textarea name="source_authorization" rows="5">{{ current_version.source_authorization }}</textarea></label></div><div class="form-actions"><button class="btn btn-secondary" type="submit">保存为新版本</button></div></form></details></section>{% endif %}
+
+<section class="form-card"><div class="section-heading first-section"><div><span class="eyebrow">AGENT IMPORT</span><h2>上传当前素材的清洗结果</h2></div></div><form method="post" action="/admin/knowledge/{{ source.id }}/import" enctype="multipart/form-data" class="inline-actions"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="file" name="document" accept=".md,.markdown" required><button class="btn btn-primary" type="submit">上传 V2 MD</button></form></section>
+
+<div class="section-heading"><h2>六维知识切片</h2><span class="subline">共 {{ source.slices|length }} 条</span></div>
+<div class="knowledge-dimension-grid">{% for code, label in dimension_labels.items() %}<section class="form-card knowledge-dimension"><div class="section-heading first-section"><h3>{{ label }}</h3><span class="badge badge-muted">{{ source.slices|selectattr('dimension','equalto',code)|list|length }}</span></div>{% set items = source.slices|selectattr('dimension','equalto',code)|list %}{% for item in items %}<article class="knowledge-item"><strong>{{ item.title }}</strong><p>{{ item.summary or item.structured_content }}</p><div class="tag-row"><span class="badge badge-muted">{{ content_type_labels.get(item.content_type,item.content_type) }}</span><span class="badge badge-muted">{{ domain_labels.get(item.primary_domain,item.primary_domain) }}</span><span class="badge {{ 'badge-success' if item.status == 'published' else 'badge-muted' }}">{{ status_labels.get(item.status,item.status) }}</span></div></article>{% else %}<div class="empty-state">该维度暂无内容</div>{% endfor %}</section>{% endfor %}</div>
+
+{% for product_type, title in [('judgement_card','判断卡'),('method_card','方法卡'),('case_card','案例卡')] %}<div class="section-heading"><h2>{{ title }}</h2></div><div class="form-card">{% set items = source.products|selectattr('product_type','equalto',product_type)|list %}{% for item in items %}<article class="knowledge-item"><strong>{{ item.title }}</strong><p>{{ item.summary }}</p><span class="badge badge-muted">{{ domain_labels.get(item.primary_domain,item.primary_domain) }}</span></article>{% else %}<div class="empty-state">暂无{{ title }}</div>{% endfor %}</div>{% endfor %}
+
+<div class="section-heading"><h2>表达风格</h2></div><div class="form-card">{% for item in source.style_entries %}<article class="knowledge-item"><strong>{{ item.title }}</strong><p>{{ item.content }}</p><span class="badge badge-muted">{{ '风格规则' if item.entry_type == 'rule' else '风格样本' }}</span></article>{% else %}<div class="empty-state">暂无风格规则或代表样本</div>{% endfor %}</div>
+
+<div class="section-heading"><h2>导入与审核记录</h2></div><div class="table-card"><table class="data-table"><thead><tr><th>版本</th><th>处理器</th><th>切片 / 产品 / 风格</th><th>状态</th><th>操作</th></tr></thead><tbody>{% for item in source.imports|selectattr('schema_version','equalto','avatar-knowledge/v2')|sort(attribute='created_at', reverse=true) %}<tr><td>v{{ item.source_version_number }}</td><td>{{ item.processor }} {{ item.processor_version }}</td><td>{{ item.slices|length }} / {{ item.products|length }} / {{ item.style_entries|length }}</td><td><span class="badge {{ 'badge-success' if item.status == 'published' else 'badge-muted' }}">{{ status_labels.get(item.status,item.status) }}</span></td><td><a class="btn btn-small btn-secondary" href="/admin/knowledge/imports/{{ item.id }}">审核</a></td></tr>{% else %}<tr><td colspan="5"><div class="empty-state">尚未导入清洗结果</div></td></tr>{% endfor %}</tbody></table></div>
 {% endblock %}
