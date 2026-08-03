@@ -1,7 +1,8 @@
 <view class="player-page">
   <view wx:if="{{loading}}" class="player-state">正在申请播放权限…</view>
   <view wx:elif="{{error}}" class="player-state error-state">
-    <text>{{error}}</text>
+    <text>{{capacityFull ? '当前在线人数已满' : error}}</text>
+    <text wx:if="{{capacityFull}}" class="capacity-note">在线 {{onlineCount}} / 100，已进入的用户不受影响</text>
     <button class="primary-button retry-button" bindtap="loadPlayer">重新进入</button>
   </view>
   <block wx:elif="{{lesson}}">

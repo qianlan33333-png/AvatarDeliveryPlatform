@@ -1,6 +1,8 @@
 {% extends "admin/base.html" %}
 {% block title %}上传 {{ asset.title }} - 分身交付平台{% endblock %}
+{% block page_kicker %}<span class="page-kicker mono">VOD DIRECT UPLOAD</span>{% endblock %}
 {% block page_title %}上传视频{% endblock %}
+{% block page_description %}视频不会经过业务服务器；上传后由腾讯云转码并分发。{% endblock %}
 {% block page_action %}<a class="btn btn-secondary" href="/admin/media">返回素材列表</a>{% endblock %}
 {% block content %}
 <div class="upload-card" data-asset-id="{{ asset.id }}">
@@ -12,7 +14,7 @@
   </form>
   {% if asset.error_message %}<div class="alert alert-error">{{ asset.error_message }}</div>{% endif %}
   {% if asset.status == 'ready' %}
-    <div class="alert alert-success">视频已完成转码，可返回课程管理绑定课节。</div>
+    <div class="alert alert-success">视频已完成转码，可返回课程管理绑定课节。</div><a class="btn btn-secondary" href="/admin/courses">去课程绑定课节</a>
   {% else %}
     <label class="drop-zone" for="video-file"><strong>选择一个视频文件</strong><span>建议上传清晰源文件；系统将在腾讯云生成 720p/480p/360p 自适应 HLS。</span><input id="video-file" type="file" accept="video/*"></label>
     <div class="progress-track" aria-label="上传进度"><span id="upload-progress"></span></div>

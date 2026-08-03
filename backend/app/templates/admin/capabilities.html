@@ -1,48 +1,35 @@
 {% extends "admin/base.html" %}
-{% block title %}AI 会员 - 分身交付平台{% endblock %}
-{% block page_title %}AI 会员{% endblock %}
-{% block page_action %}<a class="btn btn-primary" href="/admin/capabilities/mappings/new">新增商品映射</a>{% endblock %}
+{% block title %}商品映射与 AI 会员 - 分身交付平台{% endblock %}
+{% block page_kicker %}<span class="page-kicker mono">PRODUCT & AI ACCESS</span>{% endblock %}
+{% block page_title %}商品映射与 AI 会员{% endblock %}
+{% block page_description %}维护商品码对应的课程和 AI 能力，并查看最近会员权益。{% endblock %}
+{% block page_action %}<a class="btn btn-primary" href="/admin/capabilities/mappings/new">新增 AI 映射</a>{% endblock %}
 {% block content %}
 {% if notice %}<div class="alert alert-success">操作已完成</div>{% endif %}
-{% if error %}<div class="alert alert-error">操作失败，请检查参数</div>{% endif %}
-
-<div class="section-heading first-section"><div><span class="eyebrow">PRODUCT MAPPING</span><h2>AI 能力商品映射</h2></div></div>
-<div class="table-card">
-  <table class="data-table">
-    <thead><tr><th>商品码</th><th>开通能力</th><th>状态</th><th>操作</th></tr></thead>
-    <tbody>
-    {% for mapping in mappings %}
-      <tr>
-        <td><strong>{{ mapping.product_code }}</strong></td>
-        <td>{{ capability_labels.get(mapping.capability_code, mapping.capability_code) }}</td>
-        <td><span class="badge {{ 'badge-success' if mapping.is_active else 'badge-muted' }}">{{ '生效中' if mapping.is_active else '已停用' }}</span></td>
-        <td><form method="post" action="/admin/capabilities/mappings/{{ mapping.id }}/toggle"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn btn-small btn-secondary" type="submit">{{ '停用' if mapping.is_active else '启用' }}</button></form></td>
-      </tr>
-    {% else %}
-      <tr><td colspan="4"><div class="empty-state">还没有 AI 能力商品映射</div></td></tr>
-    {% endfor %}
-    </tbody>
-  </table>
+{% if error %}<div class="alert alert-error">操作失败，请检查参数。</div>{% endif %}
+<div class="stats-grid two-up">
+  <article class="stat-card"><span>聊一聊会员</span><strong>{{ capability_stats.chat_qa }}</strong><small>当前有效</small></article>
+  <article class="stat-card"><span>帮我写话术会员</span><strong>{{ capability_stats.copywriting }}</strong><small>当前有效</small></article>
 </div>
 
-<div class="section-heading"><div><span class="eyebrow">CURRENT ACCESS</span><h2>最近 AI 权益</h2></div><span class="form-help">最多显示最近 100 条</span></div>
-<div class="table-card">
-  <table class="data-table">
-    <thead><tr><th>用户</th><th>能力</th><th>状态</th><th>生效时间</th><th>到期时间</th><th>来源订单</th></tr></thead>
-    <tbody>
-    {% for row in entitlement_rows %}{% set entitlement = row.entitlement %}
-      <tr>
-        <td>{% if row.user %}<a href="/admin/capabilities/users/{{ row.user.id }}"><strong>{{ row.user.nickname or row.user.id }}</strong></a>{% else %}<span class="badge badge-muted">待手机号认领</span>{% endif %}</td>
-        <td>{{ capability_labels.get(entitlement.capability_code, entitlement.capability_code) }}</td>
-        <td><span class="badge {{ 'badge-success' if row.display_status == 'active' else ('badge-danger' if row.display_status in ['revoked', 'expired'] else 'badge-muted') }}">{{ {'active':'有效','upcoming':'待生效','expired':'已到期','revoked':'已撤销'}.get(row.display_status, row.display_status) }}</span></td>
-        <td>{{ entitlement.effective_at.strftime('%Y-%m-%d %H:%M') }}</td>
-        <td>{{ entitlement.expires_at.strftime('%Y-%m-%d %H:%M') if entitlement.expires_at else '长期' }}</td>
-        <td>{{ entitlement.source_order_id or '-' }}</td>
-      </tr>
-    {% else %}
-      <tr><td colspan="6"><div class="empty-state">尚无 AI 会员权益</div></td></tr>
-    {% endfor %}
-    </tbody>
-  </table>
-</div>
+<div class="section-heading"><div><span class="eyebrow">COURSE PRODUCTS</span><h2>课程商品码映射</h2></div></div>
+<form class="form-card compact-form-grid" method="post" action="/admin/entitlements/mappings">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <label class="field"><span>商品码</span><input name="product_code" maxlength="120" required placeholder="例如 COURSE-001"></label>
+  <label class="field"><span>开通课程</span><select name="course_id" required><option value="">请选择课程</option>{% for course in courses %}<option value="{{ course.id }}">{{ course.title }}</option>{% endfor %}</select></label>
+  <button class="btn btn-primary" type="submit">保存映射</button>
+</form>
+<div class="table-card table-spaced"><table class="data-table"><thead><tr><th>商品码</th><th>课程</th><th>状态</th><th>操作</th></tr></thead><tbody>
+{% for mapping, course in course_mappings %}<tr><td><strong>{{ mapping.product_code }}</strong></td><td>{{ course.title }}</td><td><span class="badge {{ 'badge-success' if mapping.is_active else 'badge-muted' }}">{{ '生效中' if mapping.is_active else '已停用' }}</span></td><td><form method="post" action="/admin/entitlements/mappings/{{ mapping.id }}/toggle"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn btn-small btn-secondary" type="submit">{{ '停用' if mapping.is_active else '启用' }}</button></form></td></tr>{% else %}<tr><td colspan="4"><div class="empty-state">还没有课程商品码映射。</div></td></tr>{% endfor %}
+</tbody></table></div>
+
+<div class="section-heading"><div><span class="eyebrow">AI PRODUCTS</span><h2>AI 能力商品映射</h2></div></div>
+<div class="table-card"><table class="data-table"><thead><tr><th>商品码</th><th>开通能力</th><th>状态</th><th>操作</th></tr></thead><tbody>
+{% for mapping in mappings %}<tr><td><strong>{{ mapping.product_code }}</strong></td><td>{{ capability_labels.get(mapping.capability_code, mapping.capability_code) }}</td><td><span class="badge {{ 'badge-success' if mapping.is_active else 'badge-muted' }}">{{ '生效中' if mapping.is_active else '已停用' }}</span></td><td><form method="post" action="/admin/capabilities/mappings/{{ mapping.id }}/toggle"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn btn-small btn-secondary" type="submit">{{ '停用' if mapping.is_active else '启用' }}</button></form></td></tr>{% else %}<tr><td colspan="4"><div class="empty-state">还没有 AI 能力商品映射。</div></td></tr>{% endfor %}
+</tbody></table></div>
+
+<div class="section-heading"><div><span class="eyebrow">CURRENT ACCESS</span><h2>最近 AI 权益</h2></div></div>
+<div class="table-card"><table class="data-table"><thead><tr><th>用户</th><th>能力</th><th>状态</th><th>生效时间</th><th>到期时间</th><th>来源订单</th></tr></thead><tbody>
+{% for row in entitlement_rows %}{% set entitlement = row.entitlement %}<tr><td>{% if row.user %}<a href="/admin/users/{{ row.user.id }}?tab=ai"><strong>{{ row.user.nickname or row.user.id }}</strong></a>{% else %}<span class="badge badge-muted">待手机号认领</span>{% endif %}</td><td>{{ capability_labels.get(entitlement.capability_code, entitlement.capability_code) }}</td><td><span class="badge {{ 'badge-success' if row.display_status == 'active' else ('badge-danger' if row.display_status in ['revoked', 'expired'] else 'badge-muted') }}">{{ {'active':'有效','upcoming':'待生效','expired':'已到期','revoked':'已撤销'}.get(row.display_status, row.display_status) }}</span></td><td>{{ entitlement.effective_at.strftime('%Y-%m-%d %H:%M') }}</td><td>{{ entitlement.expires_at.strftime('%Y-%m-%d %H:%M') if entitlement.expires_at else '长期' }}</td><td>{{ entitlement.source_order_id or '-' }}</td></tr>{% else %}<tr><td colspan="6"><div class="empty-state">尚无 AI 会员权益。</div></td></tr>{% endfor %}
+</tbody></table></div>
 {% endblock %}

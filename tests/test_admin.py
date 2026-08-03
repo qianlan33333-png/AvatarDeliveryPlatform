@@ -50,9 +50,12 @@ def test_admin_can_login_search_and_disable_user() -> None:
         assert "****8000" in page.text
         assert page.text.count("<h1>") == 1
 
-        csrf_match = re.search(r'name="csrf_token" value="([^"]+)"', page.text)
-        user_match = re.search(r'action="/admin/users/([^"]+)/toggle"', page.text)
-        assert csrf_match and user_match
+        user_match = re.search(r'href="/admin/users/([^"]+)"', page.text)
+        assert user_match
+        detail = client.get(f"/admin/users/{user_match.group(1)}")
+        csrf_match = re.search(r'name="csrf_token" value="([^"]+)"', detail.text)
+        assert csrf_match
+        assert f'action="/admin/users/{user_match.group(1)}/toggle"' in detail.text
 
         toggled = client.post(
             f"/admin/users/{user_match.group(1)}/toggle",
@@ -82,4 +85,3 @@ def test_admin_mutation_rejects_invalid_csrf() -> None:
         )
 
     assert response.status_code == 403
-

@@ -1,25 +1,13 @@
 {% extends "admin/base.html" %}
 {% block title %}课程管理 - 分身交付平台{% endblock %}
+{% block page_kicker %}<span class="page-kicker">COURSES</span>{% endblock %}
 {% block page_title %}课程管理{% endblock %}
-{% block page_action %}<a class="btn btn-primary" href="/admin/courses/new">创建课程</a>{% endblock %}
+{% block page_action %}<div class="inline-actions">{% if courses %}<a class="btn btn-secondary" href="/admin/courses/{{ courses[0].id }}/students">学员明细</a>{% endif %}<a class="btn btn-primary" href="/admin/courses/new">创建课程</a></div>{% endblock %}
 {% block content %}
-<div class="table-card">
-  <table class="data-table">
-    <thead><tr><th>课程</th><th>关键词</th><th>课节</th><th>排序</th><th>状态</th><th>操作</th></tr></thead>
-    <tbody>
-    {% for course in courses %}
-      <tr>
-        <td><strong>{{ course.title }}</strong><small class="subline">{{ course.subtitle or course.id }}</small></td>
-        <td><div class="tag-list">{% for keyword in course.keywords[:4] %}<span class="tag">{{ keyword }}</span>{% else %}-{% endfor %}</div></td>
-        <td>{{ course.lessons|length }}</td>
-        <td>{{ course.sort_order }}</td>
-        <td><span class="badge {{ 'badge-success' if course.status == 'published' else 'badge-muted' }}">{{ {'draft':'草稿','published':'已发布','archived':'已下架'}.get(course.status, course.status) }}</span></td>
-        <td><a class="btn btn-small btn-secondary" href="/admin/courses/{{ course.id }}/edit">编辑</a></td>
-      </tr>
-    {% else %}
-      <tr><td colspan="6"><div class="empty-state">还没有课程，先创建第一门课。</div></td></tr>
-    {% endfor %}
-    </tbody>
-  </table>
-</div>
+<div class="table-card"><table class="data-table"><thead><tr><th>课程</th><th>关键词</th><th>课节</th><th>学员数</th><th>状态</th><th>操作</th></tr></thead><tbody>
+{% for course in courses %}<tr><td><strong>{{ course.title }}</strong><small class="subline">{{ course.subtitle or course.id }}</small></td><td><div class="tag-list">{% for keyword in course.keywords[:4] %}<span class="tag">{{ keyword }}</span>{% else %}-{% endfor %}</div></td><td>{{ course.lessons|length }}</td><td><a class="btn btn-small btn-ghost" href="/admin/courses/{{ course.id }}/students">{{ student_counts.get(course.id, 0) }}</a></td><td><span class="badge {{ 'badge-success' if course.status == 'published' else 'badge-muted' }}">{{ {'draft':'草稿','published':'已发布','archived':'已下架'}.get(course.status, course.status) }}</span></td><td><a class="btn btn-small btn-secondary" href="/admin/courses/{{ course.id }}/edit">编辑</a></td></tr>
+{% else %}<tr><td colspan="6"><div class="empty-state"><span class="empty-symbol">课</span><strong class="state-title">还没有课程</strong><span class="state-copy">创建第一门课程，然后添加课节并绑定已就绪视频。</span><a class="btn btn-primary" href="/admin/courses/new">创建课程</a></div></td></tr>{% endfor %}
+</tbody></table></div>
+<div class="pagination-bar"><span>共 {{ total }} 门课程</span><nav class="pagination"><a class="page-link {{ 'disabled' if page <= 1 else '' }}" href="?page={{ page - 1 }}">←</a>{% for number in range(1, total_pages + 1) %}{% if number == 1 or number == total_pages or (number >= page - 1 and number <= page + 1) %}<a class="page-link {{ 'active' if number == page else '' }}" href="?page={{ number }}">{{ number }}</a>{% elif number == 2 and page > 3 or number == total_pages - 1 and page < total_pages - 2 %}<span>…</span>{% endif %}{% endfor %}<a class="page-link {{ 'disabled' if page >= total_pages else '' }}" href="?page={{ page + 1 }}">→</a></nav><span class="pagination-size">每页 {{ page_size }} 条</span></div>
+<div class="callout" style="margin-top:20px"><strong>发布前置</strong><span>课程发布时服务端会校验每个课节均绑定状态为 ready 的视频；试听必须使用独立试听课节。</span></div>
 {% endblock %}

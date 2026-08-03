@@ -1,6 +1,8 @@
 {% extends "admin/base.html" %}
 {% block title %}新建视频素材 - 分身交付平台{% endblock %}
+{% block page_kicker %}<span class="page-kicker mono">NEW VIDEO ASSET</span>{% endblock %}
 {% block page_title %}新建视频素材{% endblock %}
+{% block page_description %}先创建素材记录，再从浏览器直接上传到腾讯云 VOD。{% endblock %}
 {% block page_action %}<a class="btn btn-secondary" href="/admin/media">返回素材列表</a>{% endblock %}
 {% block content %}
 {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}

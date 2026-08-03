@@ -1,6 +1,8 @@
 {% extends "admin/base.html" %}
 {% block title %}视频素材 - 分身交付平台{% endblock %}
+{% block page_kicker %}<span class="page-kicker mono">VIDEO ASSETS</span>{% endblock %}
 {% block page_title %}视频素材{% endblock %}
+{% block page_description %}上传、跟踪转码状态，并将已就绪素材绑定到课程课节。{% endblock %}
 {% block page_action %}<a class="btn btn-primary" href="/admin/media/new">上传视频</a>{% endblock %}
 {% block content %}
 <div class="callout"><strong>视频不会经过业务服务器。</strong><span>后台只签发一次性上传凭证，浏览器直传腾讯云 VOD，由 VOD 完成 720p/480p/360p 转码与 CDN 分发。</span></div>
@@ -28,4 +30,5 @@
     </tbody>
   </table>
 </div>
+<div class="pagination-bar"><span>共 {{ total }} 条素材</span><nav class="pagination"><a class="page-link {{ 'disabled' if page <= 1 else '' }}" href="?page={{ page - 1 }}&size={{ size }}">←</a>{% for number in range(1, total_pages + 1) %}<a class="page-link {{ 'active' if number == page else '' }}" href="?page={{ number }}&size={{ size }}">{{ number }}</a>{% endfor %}<a class="page-link {{ 'disabled' if page >= total_pages else '' }}" href="?page={{ page + 1 }}&size={{ size }}">→</a></nav><span class="pagination-size">每页 {{ size }} 条</span></div>
 {% endblock %}

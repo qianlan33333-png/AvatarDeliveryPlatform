@@ -32,6 +32,11 @@
               </view>
             </view>
           </view>
+          <view wx:if="{{mode == 'copywriting' && item.role == 'assistant' && item.content && item.id != 'welcome'}}" class="copy-actions">
+            <button data-action="shorter" data-content="{{item.content}}" bindtap="applyCopyAction">再短一点</button>
+            <button data-action="oral" data-content="{{item.content}}" bindtap="applyCopyAction">换个更口语的开头</button>
+            <button data-action="copy" data-content="{{item.content}}" bindtap="applyCopyAction">复制</button>
+          </view>
         </view>
       </view>
 
@@ -58,6 +63,6 @@
       bindinput="onDraftInput"
       bindconfirm="onSend"
     />
-    <button class="send-button {{draft && !sending ? 'is-ready' : ''}}" disabled="{{sending}}" loading="{{sending}}" bindtap="onSend">{{sending ? '' : '发送'}}</button>
+    <button class="send-button {{draft && !sending ? 'is-ready' : ''}}" disabled="{{sending || !draft}}" loading="{{sending}}" bindtap="onSend">{{sending ? '' : '发送'}}</button>
   </view>
 </view>

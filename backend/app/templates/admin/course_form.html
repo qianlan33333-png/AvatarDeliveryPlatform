@@ -1,17 +1,13 @@
 {% extends "admin/base.html" %}
 {% block title %}创建课程 - 分身交付平台{% endblock %}
+{% block page_kicker %}<span class="page-kicker">NEW COURSE</span>{% endblock %}
 {% block page_title %}创建课程{% endblock %}
 {% block page_action %}<a class="btn btn-secondary" href="/admin/courses">返回课程列表</a>{% endblock %}
 {% block content %}
 {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
-<form class="form-card form-grid" method="post" action="/admin/courses/new">
-  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-  <label class="field field-wide"><span>课程标题 *</span><input name="title" maxlength="200" required value="{{ form_values.title }}"></label>
-  <label class="field field-wide"><span>副标题</span><input name="subtitle" maxlength="500" value="{{ form_values.subtitle }}"></label>
-  <label class="field field-wide"><span>课程简介</span><textarea name="description" rows="7">{{ form_values.description }}</textarea></label>
-  <label class="field field-wide"><span>封面 URL</span><input type="url" name="cover_url" value="{{ form_values.cover_url }}" placeholder="https://..."></label>
-  <label class="field"><span>关键词</span><input name="keywords" value="{{ form_values.keywords }}" placeholder="AI，内容，增长"></label>
-  <label class="field"><span>课程排序</span><input type="number" name="sort_order" value="{{ form_values.sort_order }}"></label>
-  <div class="form-actions field-wide"><a class="btn btn-secondary" href="/admin/courses">取消</a><button class="btn btn-primary" type="submit">创建并添加课节</button></div>
-</form>
+<form class="form-card form-grid" method="post" action="/admin/courses/new"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><label class="field field-wide"><span>课程标题 *</span><input name="title" maxlength="200" required value="{{ form_values.title }}" placeholder="例如：小红书起号 30 天陪跑"></label><label class="field field-wide"><span>副标题</span><input name="subtitle" maxlength="500" value="{{ form_values.subtitle }}" placeholder="一句话说明这门课解决什么问题"></label><label class="field field-wide"><span>课程简介</span><textarea name="description" rows="5">{{ form_values.description }}</textarea></label>
+<div class="field field-wide"><span>课程封面</span><div class="cover-upload"><div class="cover-preview" id="cover-preview">3 : 4</div><div class="cover-meta"><div class="inline-actions"><label class="btn btn-secondary" for="cover-file">从本地上传</label><input id="cover-file" type="file" accept="image/jpeg,image/png" hidden><button class="btn btn-ghost" type="button" id="show-cover-url">或填写 CDN 图片地址</button></div><small class="form-help">规格：3 : 4 竖版，建议 720 × 960 px（最小 360 × 480 px）；JPG / PNG，≤ 2 MB。当前仅完成本地校验与预览，正式直传凭证待对象存储配置。</small></div></div></div>
+<label class="field field-wide" id="cover-url-field"><span>CDN 图片地址</span><input type="url" name="cover_url" value="{{ form_values.cover_url }}" placeholder="https://..."></label><label class="field"><span>关键词</span><input name="keywords" value="{{ form_values.keywords }}" placeholder="用中文逗号分隔"></label><label class="field"><span>课程排序</span><input type="number" name="sort_order" value="{{ form_values.sort_order }}"></label><div class="form-actions field-wide"><a class="btn btn-secondary" href="/admin/courses">取消</a><button class="btn btn-primary" type="submit">创建并添加课节</button></div></form>
+<div class="callout" style="margin-top:16px">新建课程默认为草稿状态，只有发布后才会出现在小程序课程列表。</div>
 {% endblock %}
+{% block scripts %}<script>(()=>{const input=document.getElementById('cover-file');const preview=document.getElementById('cover-preview');input?.addEventListener('change',()=>{const file=input.files?.[0];if(!file)return;if(file.size>2*1024*1024){alert('封面文件不能超过 2 MB');input.value='';return;}const image=new Image();image.onload=()=>{if(image.width<360||image.height<480||Math.abs(image.width/image.height-.75)>.03){alert('请上传 3:4 竖版图片，最小 360 × 480 px');input.value='';return;}preview.innerHTML='';preview.append(image);};image.src=URL.createObjectURL(file);});})();</script>{% endblock %}

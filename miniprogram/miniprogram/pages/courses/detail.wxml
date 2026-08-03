@@ -15,8 +15,8 @@
         class="course-progress"
         percent="{{course.progress_percent}}"
         stroke-width="4"
-        activeColor="#E1B82B"
-        backgroundColor="#ECE8DE"
+        activeColor="#D97757"
+        backgroundColor="#EDEAE1"
       ></progress>
     </view>
 
@@ -28,7 +28,7 @@
           <switch
             checked="{{showIncompleteOnly}}"
             disabled="{{!course.lessons.length}}"
-            color="#E1B82B"
+            color="#D97757"
             bindchange="toggleIncomplete"
           ></switch>
         </label>

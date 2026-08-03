@@ -1,55 +1,32 @@
 {% extends "admin/base.html" %}
 {% block title %}开通记录 - 分身交付平台{% endblock %}
+{% block page_kicker %}<span class="page-kicker mono">ENTITLEMENT EVENTS</span>{% endblock %}
 {% block page_title %}开通记录{% endblock %}
+{% block page_description %}查看外部订单与人工操作产生的权益事件。{% endblock %}
 {% block content %}
 {% if notice %}<div class="alert alert-success">操作已完成</div>{% endif %}
-{% if error %}<div class="alert alert-error">操作失败，请检查商品映射或事件状态</div>{% endif %}
-
-<div class="section-heading first-section"><div><span class="eyebrow">PRODUCT MAPPING</span><h2>商品码映射</h2></div></div>
-<form class="form-card compact-form-grid" method="post" action="/admin/entitlements/mappings">
-  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-  <label class="field"><span>商品码</span><input name="product_code" maxlength="120" required placeholder="例如 COURSE-001"></label>
-  <label class="field"><span>开通课程</span><select name="course_id" required><option value="">请选择课程</option>{% for course in courses %}<option value="{{ course.id }}">{{ course.title }}</option>{% endfor %}</select></label>
-  <button class="btn btn-primary" type="submit">保存映射</button>
+{% if error %}<div class="alert alert-error">操作失败，请检查商品映射或事件状态。</div>{% endif %}
+<form class="toolbar" method="get" action="/admin/entitlements">
+  <label class="field"><span>手机号</span><input name="phone" value="{{ phone }}" placeholder="完整手机号或后四位"></label>
+  <label class="field"><span>商品名称</span><input name="product" value="{{ product }}" placeholder="课程、AI 能力或商品码"></label>
+  <div class="toolbar-actions"><button class="btn btn-primary" type="submit">查询</button><a class="btn btn-secondary" href="/admin/entitlements">清除</a></div>
 </form>
-
 <div class="table-card table-spaced">
   <table class="data-table">
-    <thead><tr><th>商品码</th><th>课程</th><th>状态</th><th>操作</th></tr></thead>
-    <tbody>
-    {% for mapping, course in mappings %}
-      <tr>
-        <td><strong>{{ mapping.product_code }}</strong></td>
-        <td>{{ course.title }}</td>
-        <td><span class="badge {{ 'badge-success' if mapping.is_active else 'badge-muted' }}">{{ '生效中' if mapping.is_active else '已停用' }}</span></td>
-        <td><form method="post" action="/admin/entitlements/mappings/{{ mapping.id }}/toggle"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn btn-small btn-secondary" type="submit">{{ '停用' if mapping.is_active else '启用' }}</button></form></td>
-      </tr>
-    {% else %}
-      <tr><td colspan="4"><div class="empty-state">还没有商品码映射</div></td></tr>
-    {% endfor %}
-    </tbody>
-  </table>
-</div>
-
-<div class="section-heading"><div><span class="eyebrow">WEBHOOK EVENTS</span><h2>最近事件</h2></div><span class="form-help">最多显示最近 100 条</span></div>
-<div class="table-card">
-  <table class="data-table">
-    <thead><tr><th>事件</th><th>手机号</th><th>商品码</th><th>动作</th><th>结果</th><th>时间</th><th>操作</th></tr></thead>
+    <thead><tr><th>事件</th><th>手机号</th><th>商品名称</th><th>动作</th><th>结果</th><th>操作</th></tr></thead>
     <tbody>
     {% for row in event_rows %}{% set event = row.event %}
       <tr>
-        <td><strong>{{ event.event_id }}</strong><small class="subline">订单 {{ event.order_id }}</small></td>
-        <td>****{{ row.phone_last4 }}</td>
-        <td>{{ event.product_code }}</td>
+        <td><strong>{{ event.event_id }}</strong><small class="subline">订单 {{ event.order_id }} · {{ event.created_at.strftime('%Y-%m-%d %H:%M') if event.created_at else '-' }}</small></td>
+        <td>{{ row.phone_masked }}</td>
+        <td><strong>{{ row.product_name }}</strong><small class="subline mono">{{ event.product_code }}</small></td>
         <td>{{ {'grant':'开通','renew':'续期','revoke':'撤销'}.get(event.action, event.action) }}</td>
-        <td><span class="badge {{ 'badge-success' if event.result == 'applied' else 'badge-danger' }}">{{ event.result }}</span>{% if event.error_message %}<small class="subline danger-text">{{ event.error_message }}</small>{% endif %}</td>
-        <td>{{ event.created_at.strftime('%Y-%m-%d %H:%M') if event.created_at else '-' }}</td>
-        <td>{% if event.result != 'applied' %}<form method="post" action="/admin/entitlements/events/{{ event.id }}/replay"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn btn-small btn-secondary" type="submit">人工重放</button></form>{% else %}-{% endif %}</td>
+        <td><span class="badge {{ 'badge-success' if event.result == 'applied' else 'badge-danger' }}">{{ {'applied':'已生效','duplicate':'重复事件','failed':'失败'}.get(event.result, event.result) }}</span>{% if event.error_message %}<small class="subline danger-text">{{ event.error_message }}</small>{% endif %}</td>
+        <td>{% if event.result != 'applied' %}<form method="post" action="/admin/entitlements/events/{{ event.id }}/replay"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn btn-small btn-secondary" type="submit">人工重放</button></form>{% else %}<span class="muted">—</span>{% endif %}</td>
       </tr>
-    {% else %}
-      <tr><td colspan="7"><div class="empty-state">尚未收到开通事件</div></td></tr>
-    {% endfor %}
+    {% else %}<tr><td colspan="6"><div class="empty-state">没有符合条件的开通事件。</div></td></tr>{% endfor %}
     </tbody>
   </table>
 </div>
+<div class="pagination-bar"><span>第 {{ start }} – {{ end }} 条，共 {{ total }} 条</span><nav class="pagination"><a class="page-link {{ 'disabled' if page <= 1 else '' }}" href="?phone={{ phone|urlencode }}&product={{ product|urlencode }}&page={{ page - 1 }}&size={{ size }}">←</a>{% for number in range(1, total_pages + 1) %}{% if number == page or number == 1 or number == total_pages or (number >= page - 1 and number <= page + 1) %}<a class="page-link {{ 'active' if number == page else '' }}" href="?phone={{ phone|urlencode }}&product={{ product|urlencode }}&page={{ number }}&size={{ size }}">{{ number }}</a>{% elif number == 2 or number == total_pages - 1 %}<span>…</span>{% endif %}{% endfor %}<a class="page-link {{ 'disabled' if page >= total_pages else '' }}" href="?phone={{ phone|urlencode }}&product={{ product|urlencode }}&page={{ page + 1 }}&size={{ size }}">→</a></nav><span class="pagination-size">每页 {{ size }} 条</span></div>
 {% endblock %}
