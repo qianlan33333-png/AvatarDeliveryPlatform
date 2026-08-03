@@ -21,6 +21,7 @@ from backend.app.modules.entitlements.router import router as entitlement_api_ro
 from backend.app.modules.identity.router import router as identity_router
 from backend.app.modules.knowledge.router import admin_router as knowledge_admin_router
 from backend.app.modules.knowledge.router import internal_router as knowledge_internal_router
+from backend.app.modules.knowledge.v2_router import router as knowledge_v2_admin_router
 from backend.app.modules.learning.router import router as learning_router
 from backend.app.modules.media.router import admin_router as media_admin_router
 from backend.app.modules.media.router import api_router as media_api_router
@@ -66,6 +67,7 @@ def create_app() -> FastAPI:
     application.include_router(chat_router)
     application.include_router(knowledge_admin_router)
     application.include_router(knowledge_internal_router)
+    application.include_router(knowledge_v2_admin_router)
 
     @application.exception_handler(HTTPException)
     async def admin_auth_redirect(request: Request, exc: HTTPException):

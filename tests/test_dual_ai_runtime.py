@@ -21,13 +21,7 @@ from backend.app.models import (
 from backend.app.modules.capabilities.models import CapabilityEntitlement
 from backend.app.modules.chat.service import generate_llm_answer
 from backend.app.modules.knowledge.models import AIRun
-from backend.app.modules.knowledge.service import (
-    create_knowledge_source,
-    export_source_markdown,
-    import_cleaned_markdown,
-    publish_knowledge_import,
-    review_knowledge_unit,
-)
+from backend.app.modules.knowledge.v2_service import create_qa_entry, set_qa_status
 from backend.app.security import encrypt_value, issue_user_token
 
 
@@ -183,9 +177,7 @@ def test_primary_model_failure_falls_back_before_output(monkeypatch) -> None:
             return SimpleNamespace(
                 choices=[
                     SimpleNamespace(
-                        message=SimpleNamespace(
-                            content='{"answer":"备用模型回答","course_ids":[]}'
-                        )
+                        message=SimpleNamespace(content='{"answer":"备用模型回答","course_ids":[]}')
                     )
                 ],
                 usage=SimpleNamespace(prompt_tokens=11, completion_tokens=7),
@@ -263,12 +255,9 @@ def test_chat_audit_is_durable_before_first_visible_delta(monkeypatch) -> None:
         session_factory = get_session_factory()
         with session_factory() as db:
             observed["run"] = db.query(AIRun).filter(AIRun.status == "completed").count() == 1
-            observed["message"] = (
-                db.query(Message).filter(Message.role == "assistant").count() == 1
-            )
+            observed["message"] = db.query(Message).filter(Message.role == "assistant").count() == 1
             observed["reservation"] = (
-                db.query(ChatReservation).filter(ChatReservation.status == "completed").count()
-                == 1
+                db.query(ChatReservation).filter(ChatReservation.status == "completed").count() == 1
             )
         return [answer]
 
@@ -330,34 +319,18 @@ def test_pure_qa_stream_returns_stored_answer_and_images_without_model(monkeypat
 
     session_factory = get_session_factory()
     with session_factory() as db:
-        source = create_knowledge_source(
+        qa = create_qa_entry(
             db,
-            title="课程有效期纯 QA",
-            source_type="pure_qa",
+            question="课程报名后可以看多久？",
+            answer="课程开通后可在会员有效期内反复观看。",
+            aliases=["课程有效期多久"],
+            keywords=["有效期"],
             visibility="public",
-            raw_content="课程报名后可以看多久？课程开通后可在会员有效期内反复观看。",
-            confirmed_facts="课程开通后可在会员有效期内反复观看",
+            images=[{"url": "https://cdn.example.com/qa/validity.png", "alt_text": "有效期示意图"}],
         )
-        exported = export_source_markdown(db, source.id)
-        cleaned = exported.replace(
-            "units: []",
-            """units:
-  - local_id: "QA-STREAM-001"
-    type: "qa"
-    question: "课程报名后可以看多久？"
-    answer: "课程开通后可在会员有效期内反复观看。"
-    aliases: ["课程有效期多久"]
-    keywords: ["有效期"]
-    channels: []
-    source_evidence: "课程开通后可在会员有效期内反复观看"
-    confirmation: "confirmed"
-    images: [{"url":"https://cdn.example.com/qa/validity.png","alt_text":"有效期示意图"}]""",
-        )
-        imported = import_cleaned_markdown(db, markdown=cleaned).knowledge_import
-        unit = imported.units[0]
-        unit_id = unit.id
-        review_knowledge_unit(db, unit_id=unit.id, decision="approved")
-        publish_knowledge_import(db, import_id=imported.id)
+        set_qa_status(db, entry_id=qa.id, status="approved")
+        set_qa_status(db, entry_id=qa.id, status="published")
+        unit_id = qa.id
 
     def model_must_not_run(*_: object, **__: object):
         raise AssertionError("strict QA must bypass the model")

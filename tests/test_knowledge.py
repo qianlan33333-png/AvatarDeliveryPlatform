@@ -35,6 +35,7 @@ from backend.app.modules.knowledge.service import (
     review_knowledge_unit,
     store_knowledge_embedding,
 )
+from backend.app.modules.knowledge.v2_service import create_v2_source
 
 
 def _cleaned_document(
@@ -48,18 +49,18 @@ def _cleaned_document(
     course_ids: list[str] | None = None,
 ) -> str:
     fields = [
-        "  - local_id: \"KU-001\"",
-        f"    type: \"{unit_type}\"",
-        "    title: \"内容方法\"",
-        f"    content: \"{content}\"",
-        "    aliases: [\"内容创作\"]",
-        "    keywords: [\"内容\",\"问题\"]",
-        "    channels: [\"朋友圈\"]",
-        f"    source_evidence: \"{evidence}\"",
-        f"    confirmation: \"{confirmation}\"",
+        '  - local_id: "KU-001"',
+        f'    type: "{unit_type}"',
+        '    title: "内容方法"',
+        f'    content: "{content}"',
+        '    aliases: ["内容创作"]',
+        '    keywords: ["内容","问题"]',
+        '    channels: ["朋友圈"]',
+        f'    source_evidence: "{evidence}"',
+        f'    confirmation: "{confirmation}"',
     ]
     if visibility:
-        fields.append(f"    visibility: \"{visibility}\"")
+        fields.append(f'    visibility: "{visibility}"')
     if course_ids is not None:
         encoded = ",".join(f'"{item}"' for item in course_ids)
         fields.append(f"    course_ids: [{encoded}]")
@@ -85,15 +86,15 @@ def _pure_qa_document(
         separators=(",", ":"),
     )
     fields = [
-        "  - local_id: \"QA-001\"",
-        "    type: \"qa\"",
+        '  - local_id: "QA-001"',
+        '    type: "qa"',
         f"    question: {json.dumps(question, ensure_ascii=False)}",
         f"    answer: {json.dumps(answer, ensure_ascii=False)}",
         f"    aliases: {encoded_aliases}",
-        "    keywords: [\"有效期\",\"观看期限\"]",
+        '    keywords: ["有效期","观看期限"]',
         "    channels: []",
-        "    source_evidence: \"课程开通后可在会员有效期内反复观看\"",
-        "    confirmation: \"confirmed\"",
+        '    source_evidence: "课程开通后可在会员有效期内反复观看"',
+        '    confirmation: "confirmed"',
         f"    images: {images}",
     ]
     return exported.replace("units: []", "units:\n" + "\n".join(fields))
@@ -134,14 +135,18 @@ def test_markdown_round_trip_is_idempotent_and_publish_is_review_gated() -> None
     with session_factory() as db:
         source = _create_source(db)
         exported = export_source_markdown(db, source.id)
-        assert "schema: \"avatar-knowledge/v1\"" in exported
+        assert 'schema: "avatar-knowledge/v1"' in exported
         assert source.id in exported
-        document = _cleaned_document(exported, confirmation="needs_confirmation").replace(
-            'processor: "manual"',
-            'processor: "test-cleaner"',
-        ).replace(
-            'processor_version: "unspecified"',
-            'processor_version: "1.0.0"',
+        document = (
+            _cleaned_document(exported, confirmation="needs_confirmation")
+            .replace(
+                'processor: "manual"',
+                'processor: "test-cleaner"',
+            )
+            .replace(
+                'processor_version: "unspecified"',
+                'processor_version: "1.0.0"',
+            )
         )
 
         imported = import_cleaned_markdown(db, markdown=document, imported_by="test-agent")
@@ -353,9 +358,7 @@ def test_pure_qa_import_rejects_dangerous_image_urls(dangerous_url: str) -> None
             db,
             title="课程纯问答",
             source_type="pure_qa",
-            raw_content=(
-                "课程报名后可以看多久？课程开通后可在会员有效期内反复观看。"
-            ),
+            raw_content=("课程报名后可以看多久？课程开通后可在会员有效期内反复观看。"),
             confirmed_facts="课程开通后可在会员有效期内反复观看",
         )
         document = _pure_qa_document(
@@ -391,9 +394,7 @@ def test_pure_qa_strict_match_returns_standard_answer_and_authorized_images() ->
             source_type="pure_qa",
             visibility="course",
             course_ids=[course.id],
-            raw_content=(
-                "课程报名后可以看多久？课程开通后可在会员有效期内反复观看。"
-            ),
+            raw_content=("课程报名后可以看多久？课程开通后可在会员有效期内反复观看。"),
             confirmed_facts="课程开通后可在会员有效期内反复观看",
         )
         document = _pure_qa_document(
@@ -402,9 +403,7 @@ def test_pure_qa_strict_match_returns_standard_answer_and_authorized_images() ->
         )
         imported = import_cleaned_markdown(db, markdown=document)
         unit = imported.knowledge_import.units[0]
-        asset = db.scalar(
-            select(KnowledgeUnitAsset).where(KnowledgeUnitAsset.unit_id == unit.id)
-        )
+        asset = db.scalar(select(KnowledgeUnitAsset).where(KnowledgeUnitAsset.unit_id == unit.id))
         assert unit.status == "draft"
         assert asset is not None and asset.status == "draft"
 
@@ -468,9 +467,7 @@ def test_pure_qa_near_tie_does_not_choose_an_arbitrary_stored_answer() -> None:
                 db,
                 title=f"重复问法-{suffix}",
                 source_type="pure_qa",
-                raw_content=(
-                    "课程报名后可以看多久？课程开通后可在会员有效期内反复观看。"
-                ),
+                raw_content=("课程报名后可以看多久？课程开通后可在会员有效期内反复观看。"),
                 confirmed_facts="课程开通后可在会员有效期内反复观看",
             )
             _approve_and_publish(
@@ -507,9 +504,7 @@ def test_pure_qa_margin_compares_candidates_below_the_confidence_threshold() -> 
                 db,
                 title=f"近似问法-{index}",
                 source_type="pure_qa",
-                raw_content=(
-                    f"{question}？课程开通后可在会员有效期内反复观看。"
-                ),
+                raw_content=(f"{question}？课程开通后可在会员有效期内反复观看。"),
                 confirmed_facts="课程开通后可在会员有效期内反复观看",
             )
             _approve_and_publish(
@@ -538,7 +533,7 @@ def test_internal_api_fails_closed_then_exports_ready_source(monkeypatch) -> Non
     app.include_router(internal_router)
     session_factory = get_session_factory()
     with session_factory() as db:
-        source = _create_source(db)
+        source = create_v2_source(db, title="V2 待清洗素材", raw_content="内容要解决真实问题。")
         mark_source_ready_for_agent(db, source.id)
 
     with TestClient(app) as client:
@@ -590,14 +585,7 @@ def test_admin_knowledge_list_and_level_two_create_flow() -> None:
             data={
                 "csrf_token": csrf_token,
                 "title": "后台录入语料",
-                "source_type": "notes",
-                "visibility": "public",
                 "raw_content": "内容要解决真实问题。",
-                "confirmed_facts": "内容要解决真实问题",
-                "pending_confirmation_points": "",
-                "cleaning_requirements": "拆成原子知识",
-                "prohibited_content": "不得编造",
-                "source_authorization": "本人授权",
             },
             follow_redirects=False,
         )
@@ -608,9 +596,10 @@ def test_admin_knowledge_list_and_level_two_create_flow() -> None:
 
     assert detail.status_code == 200
     assert "后台录入语料" in detail.text
-    assert "输入快照" in detail.text
+    assert "原始素材 · v1" in detail.text
     assert exported.status_code == 200
     assert exported.headers["content-type"].startswith("text/markdown")
+    assert 'schema: "avatar-knowledge/v2"' in exported.text
 
 
 def test_admin_review_edits_pure_qa_answer_and_image_as_plain_fields() -> None:
@@ -632,9 +621,7 @@ def test_admin_review_edits_pure_qa_answer_and_image_as_plain_fields() -> None:
                 db,
                 title="后台 QA 审核",
                 source_type="pure_qa",
-                raw_content=(
-                    "课程报名后可以看多久？课程开通后可在会员有效期内反复观看。"
-                ),
+                raw_content=("课程报名后可以看多久？课程开通后可在会员有效期内反复观看。"),
                 confirmed_facts="课程开通后可在会员有效期内反复观看",
             )
             imported = import_cleaned_markdown(

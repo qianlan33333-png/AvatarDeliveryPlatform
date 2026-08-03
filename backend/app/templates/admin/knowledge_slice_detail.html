@@ -1,0 +1,7 @@
+{% extends "admin/base.html" %}
+{% block title %}{{ item.title }} - 知识切片{% endblock %}
+{% block page_kicker %}<span class="page-kicker mono">KNOWLEDGE SLICE</span>{% endblock %}
+{% block page_title %}{{ item.title }}{% endblock %}
+{% block page_description %}{{ dimension_labels.get(item.dimension,item.dimension) }} · {{ content_type_labels.get(item.content_type,item.content_type) }} · {{ domain_labels.get(item.primary_domain,item.primary_domain) }}{% endblock %}
+{% block page_action %}<a class="btn btn-secondary" href="/admin/knowledge-slices?dimension={{ item.dimension }}">返回切片列表</a>{% endblock %}
+{% block content %}<div class="form-card"><div class="form-grid"><div class="field field-wide"><span>摘要</span><p>{{ item.summary or '-' }}</p></div><div class="field field-wide"><span>结构化内容</span><pre>{{ item.structured_content }}</pre></div><div class="field field-wide"><span>使用场景</span><p>{{ item.usage_context or '-' }}</p></div><div class="field field-wide"><span>金句</span><blockquote>{{ item.golden_sentence or '-' }}</blockquote></div><div class="field field-wide"><span>原文证据</span><blockquote>{{ item.source_evidence }}</blockquote></div><div class="field field-wide"><span>原文摘录</span><pre>{{ item.original_excerpt }}</pre></div><div class="field"><span>来源素材</span><a href="/admin/knowledge/{{ item.source_id }}">{{ item.source.title }}</a></div><div class="field"><span>审核状态</span><span class="badge {{ 'badge-success' if item.status == 'published' else 'badge-muted' }}">{{ item.status }}</span></div></div></div>{% endblock %}

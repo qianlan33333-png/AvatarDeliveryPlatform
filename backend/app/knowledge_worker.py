@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import signal
 import time
 from pathlib import Path
@@ -22,6 +23,7 @@ from backend.app.modules.knowledge.service import (
     fail_index_job,
     store_knowledge_embedding,
 )
+from backend.app.modules.knowledge.v2_service import store_v2_embedding
 
 HEARTBEAT_PATH = Path("/tmp/avatar-knowledge-worker-heartbeat")
 _running = True
@@ -67,17 +69,44 @@ def process_index_job(
             settings=configured,
         )
         return
-    units = [unit for unit in knowledge_import.units if unit.status == "published"]
-    if not units:
+    if knowledge_import.schema_version == "avatar-knowledge/v2":
+        targets = [
+            *[
+                ("slice", item, f"{item.title}\n{item.summary}\n{item.structured_content}")
+                for item in knowledge_import.slices
+                if item.status == "published"
+            ],
+            *[
+                (
+                    "product",
+                    item,
+                    f"{item.title}\n{item.summary}\n{json.dumps(item.payload, ensure_ascii=False)}",
+                )
+                for item in knowledge_import.products
+                if item.status == "published"
+            ],
+            *[
+                ("style", item, f"{item.title}\n{item.content}")
+                for item in knowledge_import.style_entries
+                if item.status == "published"
+            ],
+        ]
+    else:
+        targets = [
+            ("unit", unit, f"{unit.title}\n{unit.content}")
+            for unit in knowledge_import.units
+            if unit.status == "published"
+        ]
+    if not targets:
         fail_index_job(
             db,
             job_id=job.id,
-            error_message="published units not found",
+            error_message="published index targets not found",
             retryable=False,
             settings=configured,
         )
         return
-    texts = [f"{unit.title}\n{unit.content}" for unit in units]
+    texts = [target[2] for target in targets]
     candidates = _candidate_models(db, job)
     if not candidates:
         fail_index_job(
@@ -102,17 +131,28 @@ def process_index_job(
             batch_size = max(1, min(configured.knowledge_embedding_batch_size, 128))
             for start in range(0, len(texts), batch_size):
                 vectors.extend(embed_texts(config, texts[start : start + batch_size], configured))
-            if len(vectors) != len(units):
+            if len(vectors) != len(targets):
                 raise ValueError("embedding result count mismatch")
-            for unit, vector in zip(units, vectors, strict=True):
-                store_knowledge_embedding(
-                    db,
-                    unit_id=unit.id,
-                    embedding=vector,
-                    model_name=config.model_name,
-                    model_version=job.target_model_version,
-                    activate=activate,
-                )
+            for (kind, owner, _), vector in zip(targets, vectors, strict=True):
+                if kind == "unit":
+                    store_knowledge_embedding(
+                        db,
+                        unit_id=owner.id,
+                        embedding=vector,
+                        model_name=config.model_name,
+                        model_version=job.target_model_version,
+                        activate=activate,
+                    )
+                else:
+                    store_v2_embedding(
+                        db,
+                        kind=kind,
+                        owner_id=owner.id,
+                        embedding=vector,
+                        model_name=config.model_name,
+                        model_version=job.target_model_version,
+                        activate=activate,
+                    )
             complete_index_job(db, job_id=job.id)
             return
         except Exception as exc:

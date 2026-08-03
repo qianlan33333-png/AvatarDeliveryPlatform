@@ -12,6 +12,7 @@ SCHEMA_VERSION = "avatar-knowledge/v1"
 CLEANED_SCHEMA_VERSION = 1
 
 SOURCE_TYPES = {
+    "material",
     "transcript",
     "article",
     "faq",
